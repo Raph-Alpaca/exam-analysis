@@ -15,13 +15,15 @@ export function levelMatrixRows(result: AnalysisResult): MatrixRow[] {
       const s = result.itemsByLevel[l].find((x) => x.no === it.no)
       return [l, s && s.n > 0 ? s.p : null]
     })) as Record<Level, number | null>
-    // 높은 수준보다 낮은 수준의 정답률이 10%p 이상 높으면 역전
+    // 높은 수준보다 낮은 수준의 정답률이 15%p 이상 높으면 역전 (두 집단 모두 5명 이상일 때만 판단)
     let reversed = false
     for (let i = 0; i < LEVELS.length; i++)
       for (let j = i + 1; j < LEVELS.length; j++) {
         const hi = byLevel[LEVELS[i]!]
         const lo = byLevel[LEVELS[j]!]
-        if (hi != null && lo != null && lo > hi + 10) reversed = true
+        const nHi = result.byLevel[LEVELS[i]!].n
+        const nLo = result.byLevel[LEVELS[j]!].n
+        if (hi != null && lo != null && nHi >= 5 && nLo >= 5 && lo > hi + 15) reversed = true
       }
     return { no: it.no, key: it.key, all: it.p, byLevel, reversed }
   })
@@ -116,7 +118,7 @@ export function LevelAnalysisTab({ exam, result }: { exam: Exam; result: Analysi
 
       <section className="card">
         <SectionTitle title="문항 × 성취수준 정답률">
-          진할수록 정답률이 높습니다. 낮은 수준의 정답률이 높은 수준보다 10%p 이상 높은 문항은 "수준 역전"으로 표시합니다(문항 또는 답지 검토 필요). 행을 누르면 답지반응 상세.
+          진할수록 정답률이 높습니다. 낮은 수준의 정답률이 높은 수준보다 15%p 이상 높은 문항은 "수준 역전"으로 표시합니다(두 집단 모두 5명 이상일 때, 문항·답지 검토 필요). 행을 누르면 답지반응 상세.
         </SectionTitle>
         <DataTable columns={levelMatrixColumns(result)} rows={rows} rowKey={(r) => String(r.no)} onRowClick={(r) => setUi({ selectedItemNo: r.no })} selectedKey={selectedItem == null ? null : String(selectedItem)} compact />
       </section>

@@ -120,20 +120,19 @@ function addTable(ws: Worksheet, startRow: number, spec: TableSpec, caption?: st
 
 function itemRows(stats: ItemStats[], exam: Exam, extra?: (s: ItemStats) => Cell[]): Cell[][] {
   const byNo = new Map(exam.items.map((i) => [i.no, i]))
+  const info = exam.hasItemInfo
   return stats.map((s) => {
     const it = byNo.get(s.no)
-    return [...(extra ? extra(s) : []), s.no, s.key.join(',') || '-', s.points, it?.domain ?? '', it?.standards.join(' ') ?? '', s.expected ?? '', fmtOrNull(s.p), s.observed3 ?? '', fmtOrNull(s.disc), discBand(s.disc)?.label ?? '', ...CHOICES.map((c) => fmtOrNull(s.pct[c])), fmtOrNull(s.pct.none), s.flags.filter((f) => f.severity !== 'info').map((f) => f.label).join(', ')]
+    return [...(extra ? extra(s) : []), s.no, s.key.join(',') || '-', s.points, ...(info ? [it?.domain ?? '', it?.standards.join(' ') ?? '', s.expected ?? ''] : []), fmtOrNull(s.p), s.observed3 ?? '', fmtOrNull(s.disc), discBand(s.disc)?.label ?? '', ...CHOICES.map((c) => fmtOrNull(s.pct[c])), fmtOrNull(s.pct.none), s.flags.filter((f) => f.severity !== 'info').map((f) => f.label).join(', ')]
   })
 }
 
-const ITEM_COLS = (extra: { header: string; width?: number }[] = []) => [
+const ITEM_COLS = (exam: Exam, extra: { header: string; width?: number }[] = []) => [
   ...extra,
   { header: '문항', width: 6 },
   { header: '정답', width: 6 },
   { header: '배점', width: 6 },
-  { header: '내용영역', width: 14 },
-  { header: '성취기준', width: 14 },
-  { header: '예상난이도', width: 10 },
+  ...(exam.hasItemInfo ? [{ header: '내용영역', width: 14 }, { header: '성취기준', width: 14 }, { header: '예상난이도', width: 10 }] : []),
   { header: '정답률(%)', width: 10, fmt: '0.0' },
   { header: '난이도 판정', width: 10 },
   { header: '변별도', width: 8, fmt: '0.00' },
@@ -239,7 +238,7 @@ export async function buildWorkbook(exam: Exam, result: AnalysisResult, settings
   {
     const ws = wb.addWorksheet('문항별분석')
     const r = addTitle(ws, '문항별 정답률 및 답지반응 분포 (전체)', meta, 10)
-    addTable(ws, r, { columns: ITEM_COLS(), rows: itemRows(result.items, exam) })
+    addTable(ws, r, { columns: ITEM_COLS(exam), rows: itemRows(result.items, exam) })
     ws.views = [{ state: 'frozen', ySplit: r + 1 }]
   }
 
@@ -283,7 +282,7 @@ export async function buildWorkbook(exam: Exam, result: AnalysisResult, settings
     const r = addTitle(ws, '학급별 문항 분석', meta, 10)
     const rows: Cell[][] = []
     for (const c of result.classNos) rows.push(...itemRows(result.itemsByClass[c]!, exam, () => [`${c}반`, result.byClass[c]!.n]))
-    addTable(ws, r, { columns: ITEM_COLS([{ header: '학급', width: 7 }, { header: '학생 수', width: 8 }]), rows })
+    addTable(ws, r, { columns: ITEM_COLS(exam, [{ header: '학급', width: 7 }, { header: '학생 수', width: 8 }]), rows })
     ws.autoFilter = { from: { row: r + 2, column: 1 }, to: { row: r + 1 + rows.length, column: 5 } }
   }
 

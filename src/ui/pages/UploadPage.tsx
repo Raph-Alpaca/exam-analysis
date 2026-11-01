@@ -3,6 +3,7 @@ import { useAppStore, type FileEntry } from '../store/useAppStore'
 import { navigate } from '../app/router'
 import { Callout, WarningList } from '../components/basic'
 import { describeHeader } from '../../parsers/header'
+import { loadDemoFiles } from '../store/demo'
 
 function FileChip({ f, onRemove }: { f: FileEntry; onRemove: () => void }) {
   const icon = f.status === 'parsing' ? '⏳' : f.status === 'ok' ? '✅' : '⚠️'
@@ -28,14 +29,7 @@ function DemoButton() {
     setBusy(true)
     setErr(null)
     try {
-      const base = import.meta.env.BASE_URL
-      const manifest = (await (await fetch(`${base}demo/manifest.json`)).json()) as { files: string[] }
-      const files: File[] = []
-      for (const name of manifest.files) {
-        const buf = await (await fetch(`${base}demo/${encodeURIComponent(name)}`)).arrayBuffer()
-        files.push(new File([buf], name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
-      }
-      await addFiles(files)
+      await addFiles(await loadDemoFiles())
     } catch (e) {
       setErr(`예시 데이터를 불러오지 못했습니다: ${e instanceof Error ? e.message : String(e)}`)
     } finally {

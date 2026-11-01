@@ -43,10 +43,10 @@ export function StudentReport({ exam, result, student, settings, compact }: { ex
     { id: 'status', header: '도달', cell: (r) => <Badge tone={r.status === '도달' ? 'good' : r.status === '부분' ? 'warn' : 'danger'}>{r.status}</Badge>, align: 'center' },
   ]
   return (
-    <article className="stack" aria-label={`${st.classNo}반 ${st.seatNo}번 ${st.name} 리포트`}>
+    <article className={`stack${compact ? ' student-compact' : ''}`} aria-label={`${st.classNo}반 ${st.seatNo}번 ${st.name} 리포트`}>
       <div className="report-head">
         <div>
-          <div className="muted small">{describeHeader(exam.header)}</div>
+          {!compact && <div className="muted small">{describeHeader(exam.header)}</div>}
           <h2 style={{ margin: 0 }}>
             {st.classNo}반 {st.seatNo}번 {st.name}
           </h2>
@@ -80,7 +80,7 @@ export function StudentReport({ exam, result, student, settings, compact }: { ex
         <section>
           <h3>성취기준별 도달 현황</h3>
           <DataTable columns={stdCols} rows={student.standards} rowKey={(r) => r.code} compact />
-          <p className="small muted" style={{ marginTop: 6 }}>
+          <p className="small muted" style={{ marginTop: 4, marginBottom: 0 }}>
             도달: 성취율 {settings.standardPassPct}% 이상 · 부분: 50% 이상 · 미도달: 50% 미만
           </p>
         </section>

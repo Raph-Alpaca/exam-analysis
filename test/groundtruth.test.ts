@@ -8,7 +8,11 @@ import { describe, expect, it } from 'vitest'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { readWorkbookData } from '../src/xlsx/readWorkbook'
+import { writeFileSync } from 'node:fs'
 import { buildExam, parseGrids, type ParsedFile } from '../src/parsers/index'
+import { analyze } from '../src/stats/analyze'
+import { DEFAULT_SETTINGS } from '../src/model/settings'
+import { buildWorkbook, exportFileName } from '../src/export/excel'
 
 const root = process.env.NEIS_SAMPLE_DIR
 const dirs: string[] = []
@@ -106,6 +110,18 @@ run('실제 NEIS 샘플 (NEIS_SAMPLE_DIR)', () => {
         const diff = { 어려움: 0, 보통: 0, 쉬움: 0 }
         for (const i of mc) diff[i.difficulty!]++
         expect(diff.어려움 + diff.보통 + diff.쉬움).toBe(mc.length)
+      })
+
+      it('분석·엑셀 내보내기가 오류 없이 된다 (NEIS_EXPORT_DIR 지정 시 파일 저장)', async () => {
+        const parsed = await loadDir(dir)
+        const { exam } = buildExam(parsed)
+        const result = analyze(exam!, DEFAULT_SETTINGS)
+        expect(result.students.length).toBe(exam!.classes.reduce((a, c) => a + c.students.length, 0))
+        expect(result.warnings.filter((w) => w.code === 'score-mismatch')).toEqual([])
+        const wb = await buildWorkbook(exam!, result, DEFAULT_SETTINGS)
+        const buf = await wb.xlsx.writeBuffer()
+        expect(buf.byteLength).toBeGreaterThan(10000)
+        if (process.env.NEIS_EXPORT_DIR) writeFileSync(join(process.env.NEIS_EXPORT_DIR, exportFileName(exam!)), Buffer.from(buf))
       })
 
       it('정답/배점표가 있으면 정오표와 정답·배점이 일치한다', async () => {

@@ -142,9 +142,7 @@ export function PrintReportPage() {
       {on('levels') && (
         <section className="print-page">
           <PrintHeader title="4. 성취수준별" meta={meta} />
-          <h2>성취수준별 문항 정답률</h2>
-          <DataTable columns={levelMatrixColumns(result)} rows={levelMatrixRows(result)} rowKey={(r) => String(r.no)} compact />
-          <h3 style={{ marginTop: 14 }}>정답률이 높은·낮은 3문항</h3>
+          <h2>정답률이 높은·낮은 3문항</h2>
           <table className="data compact">
             <thead>
               <tr>
@@ -170,6 +168,8 @@ export function PrintReportPage() {
               })}
             </tbody>
           </table>
+          <h3 style={{ marginTop: 14 }}>성취수준별 문항 정답률</h3>
+          <DataTable columns={levelMatrixColumns(result)} rows={levelMatrixRows(result)} rowKey={(r) => String(r.no)} compact />
         </section>
       )}
 

@@ -45,7 +45,11 @@ export function describeHeader(h: ExamHeader): string {
   if (h.year) bits.push(`${h.year}학년도`)
   if (h.semester) bits.push(`${h.semester}학기`)
   if (h.grade) bits.push(`${h.grade}학년`)
-  if (h.examName) bits.push(h.examName)
+  if (h.examName) {
+    const prefix = h.grade ? `${h.grade}학년` : ''
+    const name = prefix && h.examName.startsWith(prefix) ? h.examName.slice(prefix.length).trim() : h.examName
+    if (name) bits.push(name)
+  }
   if (h.subject) bits.push(h.subject)
   return bits.length ? bits.join(' ') : h.raw
 }
