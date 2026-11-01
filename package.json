@@ -1,0 +1,32 @@
+{
+  "name": "exam-analysis",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "NEIS 엑셀 파일을 브라우저에서 바로 분석하는 성취평가 결과 분석 도구",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit",
+    "make-demo": "node scripts/make-demo.ts"
+  },
+  "dependencies": {
+    "echarts": "^6.1.0",
+    "exceljs": "^4.4.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zustand": "^5.0.16"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}

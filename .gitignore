@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+.env
+.env.*
+npm-debug.log*
+coverage
+
+# 학생 자료는 절대 커밋하지 않는다. 합성 데모 파일만 허용.
+*.xls
+*.xlsx
+!public/demo/*.xlsx
+분석할 자료*
