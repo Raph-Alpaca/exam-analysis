@@ -265,6 +265,9 @@ export interface ItemAnalysisSpec {
   gradeBlank?: number[]
   classMulti?: number[]
   gradeMulti?: number[]
+  /** 합계·정답률 분모 (NEIS는 학생 수). 없으면 답지 합 + 무표기 + 중복으로 계산 */
+  classN?: number
+  gradeN?: number
   rowsPerPage?: number
 }
 
@@ -290,8 +293,8 @@ export function makeItemAnalysis(spec: ItemAnalysisSpec): Aoa {
     }
     const cc = spec.classCounts[i]!
     const gc = spec.gradeCounts[i]!
-    const cn = cc.reduce((a, b) => a + b, 0) + (spec.classBlank?.[i] ?? 0) + (spec.classMulti?.[i] ?? 0)
-    const gn = gc.reduce((a, b) => a + b, 0) + (spec.gradeBlank?.[i] ?? 0) + (spec.gradeMulti?.[i] ?? 0)
+    const cn = spec.classN ?? cc.reduce((a, b) => a + b, 0) + (spec.classBlank?.[i] ?? 0) + (spec.classMulti?.[i] ?? 0)
+    const gn = spec.gradeN ?? gc.reduce((a, b) => a + b, 0) + (spec.gradeBlank?.[i] ?? 0) + (spec.gradeMulti?.[i] ?? 0)
     const k = spec.keys[i]! - 1
     const cp = (100 * cc[k]!) / cn
     const gp = (100 * gc[k]!) / gn
