@@ -9,6 +9,7 @@ export interface FileEntry {
   id: string
   name: string
   size: number
+  lastModified: number
   status: 'parsing' | 'ok' | 'error'
   kind?: FileKind
   label?: string
@@ -80,8 +81,9 @@ export const useAppStore = create<AppState>()(
       async addFiles(list) {
         const incoming = list.filter((f) => /\.xlsx?$/i.test(f.name) || /spreadsheet|excel/i.test(f.type))
         const skipped = list.length - incoming.length
-        const entries: FileEntry[] = incoming.map((f) => ({ id: `f${++seq}`, name: f.name, size: f.size, status: 'parsing' }))
-        set((s) => ({ files: [...s.files.filter((e) => !incoming.some((f) => f.name === e.name)), ...entries] }))
+        const entries: FileEntry[] = incoming.map((f) => ({ id: `f${++seq}`, name: f.name, size: f.size, lastModified: f.lastModified, status: 'parsing' }))
+        const same = (e: FileEntry, f: File) => e.name === f.name && e.size === f.size && e.lastModified === f.lastModified
+        set((s) => ({ files: [...s.files.filter((e) => !incoming.some((f) => same(e, f))), ...entries] }))
         await Promise.all(
           incoming.map(async (file, i) => {
             const entry = entries[i]!

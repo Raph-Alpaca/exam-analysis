@@ -29,7 +29,7 @@ export interface AnswerSheetParse {
   warnings: Warning[]
 }
 
-const RE_CLASS_SEAT = /^\s*0*(\d+)\s*\/\s*0*(\d+)\s*$/
+const RE_CLASS_SEAT = /^\s*0*(\d+)\s*[\/\-]\s*0*(\d+)\s*$/
 const RE_INT = /^\d+$/
 const RE_MC_SCORE = /선택형\s*점수|선다형\s*점수/
 const RE_CR_SCORE = /서답형\s*점수|서술형\s*점수/

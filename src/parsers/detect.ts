@@ -19,7 +19,7 @@ export function detectKind(grid: CellGrid): FileKind {
   if (/학생\s*답\s*정오표/.test(head)) return 'answers'
   if (/문항\s*분석표/.test(head)) return 'itemAnalysis'
   if (/정답\s*\/\s*배점/.test(head)) return 'answerKey'
-  if (/문\s*항\s*정\s*보\s*표/.test(head)) return 'itemInfo'
+  if (/문\s*항\s*정\s*보\s*표/.test(head) || /이\s*원\s*목\s*적\s*분\s*류\s*표/.test(head)) return 'itemInfo'
   // 보조 판별: 헤더 구조로
   if (/반\s*\/\s*번호/.test(head) && /정답/.test(head) && /배점/.test(head)) return 'answers'
   if (/문항번호/.test(head) && /성취기준/.test(head)) return 'itemInfo'

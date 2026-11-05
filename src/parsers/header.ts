@@ -13,7 +13,7 @@ export function parseExamHeader(raw: string): ExamHeader {
   if (sem) out.semester = sem[1]
   const gr = /(\d)\s*학년(?!도)/.exec(s)
   if (gr) out.grade = gr[1]
-  const cls = /(\d+)\s*반/.exec(s)
+  const cls = /(\d+)\s*(?:반|강의실)/.exec(s)
   let rest = ''
   if (cls) {
     out.classNo = String(Number(cls[1]))

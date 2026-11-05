@@ -1,9 +1,12 @@
-import type { ClassRoster, Exam, ExamHeader, Item, Standard, Student, Warning } from '../model/types'
+import type { ClassRoster, Exam, ExamHeader, GradeReference, Item, Standard, Student, Warning } from '../model/types'
 import type { FileKind } from './detect'
 import type { AnswerSheetParse } from './answerSheet'
 import type { ItemInfoParse } from './itemInfo'
 import type { AnswerKeyParse } from './answerKey'
 import type { ItemAnalysisParse } from './itemAnalysis'
+import { describeHeader } from './header'
+import { neisCountsFor } from '../stats/neisTable'
+import { isNoResponse } from '../stats/inclusion'
 
 export interface ParsedFile {
   fileName: string
@@ -28,8 +31,62 @@ function sameKey(a: number[], b: number[]): boolean {
   return sa.every((v, i) => v === sb[i])
 }
 
+/** 비교용 정규화: 공백 제거, 앞의 "3학년" 같은 학년 표기 제거 */
+export function normName(s: string | undefined): string {
+  return (s ?? '').replace(/\s+/g, '').replace(/^\d학년/, '')
+}
+
 function groupKey(h: ExamHeader): string {
-  return [h.year ?? '', h.semester ?? '', h.grade ?? '', h.examName ?? '', h.subject ?? ''].join('|')
+  return [h.year ?? '', h.semester ?? '', h.grade ?? '', normName(h.examName), normName(h.subject)].join('|')
+}
+
+/** 두 머리글이 모두 값이 있는 항목에서 서로 다른지 */
+function headerConflicts(a: ExamHeader, b: ExamHeader | undefined): string[] {
+  if (!b) return []
+  const out: string[] = []
+  const cmp = (label: string, x: string | undefined, y: string | undefined) => {
+    if (x && y && x !== y) out.push(label)
+  }
+  cmp('교과목', normName(a.subject) || undefined, normName(b.subject) || undefined)
+  cmp('고사', normName(a.examName) || undefined, normName(b.examName) || undefined)
+  cmp('학기', a.semester, b.semester)
+  cmp('학년도', a.year, b.year)
+  return out
+}
+
+function keySignature(a: AnswerSheetParse): string {
+  return a.mcItems.map((it) => `${it.no}:${(it.key?.key ?? []).join(',')}:${it.points ?? ''}`).join(';') + `|cr${a.crItems.length}`
+}
+
+type IaCheck = { status: 'verified' | 'mismatch' | 'unverifiable'; details: string[] }
+
+/** 문항분석표의 반 수치를 같은 반 정오표로 계산한 값과 대조 */
+function verifyItemAnalysis(ia: ItemAnalysisParse, mcItems: Item[], classes: ClassRoster[]): IaCheck {
+  const cls = ia.classNo ? classes.find((c) => c.classNo === ia.classNo) : undefined
+  if (!cls) return { status: 'unverifiable', details: [] }
+  const tryWith = (students: Student[]): string[] => {
+    const rows = neisCountsFor(mcItems, students)
+    const diffs: string[] = []
+    for (const ref of ia.items) {
+      const r = rows.find((x) => x.no === ref.no)
+      if (!r) {
+        diffs.push(`${ref.no}번: 정오표에 없는 문항`)
+        continue
+      }
+      const ours = [1, 2, 3, 4, 5].map((k) => r.counts[k as 1])
+      const theirs = [1, 2, 3, 4, 5].map((k) => ref.classCounts[k as 1])
+      if (ours.join(',') !== theirs.join(',') || r.blank !== ref.classBlank || r.multi !== ref.classMulti) {
+        diffs.push(`${ref.no}번: 문항분석표 ${theirs.join('/')} · 정오표 ${ours.join('/')}`)
+      }
+    }
+    if (ia.classN && ia.classN !== students.length) diffs.unshift(`학생 수: 문항분석표 ${ia.classN}명 · 정오표 ${students.length}명`)
+    return diffs
+  }
+  const all = tryWith(cls.students)
+  if (all.length === 0) return { status: 'verified', details: [] }
+  const responded = cls.students.filter((s) => !isNoResponse(s))
+  if (responded.length !== cls.students.length && tryWith(responded).length === 0) return { status: 'verified', details: [] }
+  return { status: 'mismatch', details: all }
 }
 
 /** 파싱된 파일들을 하나의 Exam 으로 합친다. 정오표가 기준이며 다른 표는 보강·검증용. */
@@ -46,16 +103,20 @@ export function buildExam(files: ParsedFile[]): BuildResult {
     return { exam: null, errors, warnings }
   }
 
-  // 같은 시험인지
+  // 같은 시험인지 (제목 띄어쓰기 차이는 무시, 제목이 달라도 정답·배점이 모두 같으면 같은 시험으로 본다)
   const groups = new Map<string, AnswerSheetParse[]>()
   for (const a of answers) {
     const k = groupKey(a.header)
     groups.set(k, [...(groups.get(k) ?? []), a])
   }
   if (groups.size > 1) {
-    const desc = [...groups.values()].map((g) => `${g[0]!.header.raw || '(제목 없음)'} ← ${g.map((x) => x.fileName).join(', ')}`)
-    errors.push({ level: 'error', code: 'mixed-exams', message: '서로 다른 시험의 정오표가 섞여 있습니다. 한 시험의 파일만 남겨 주세요.', details: desc })
-    return { exam: null, errors, warnings }
+    const desc = [...groups.values()].map((g) => `${describeHeader(g[0]!.header) || '(제목 없음)'} ← ${g.map((x) => x.fileName).join(', ')}`)
+    const sigs = new Set(answers.map(keySignature))
+    if (sigs.size > 1) {
+      errors.push({ level: 'error', code: 'mixed-exams', message: '서로 다른 시험(교과·고사)의 정오표가 섞여 있습니다. 한 시험의 파일만 남기고 나머지는 ✕로 빼 주세요.', details: desc })
+      return { exam: null, errors, warnings }
+    }
+    warnings.push({ level: 'info', code: 'header-variants', message: '정오표마다 제목 표기가 조금 다르지만 정답·배점이 모두 같아 같은 시험으로 합쳤습니다.', details: desc })
   }
 
   // 문항 정의 일치 검증 (정오표 간)
@@ -90,20 +151,40 @@ export function buildExam(files: ParsedFile[]): BuildResult {
   const mcItems = items.filter((i) => i.kind === 'mc')
   const crItems = items.filter((i) => i.kind === 'cr')
 
-  // 학급 합치기
-  const classMap = new Map<string, ClassRoster>()
-  const idSeen = new Map<string, string>()
+  // 학급 합치기: 학생(반/번호) 단위로 합친다. 같은 반이 여러 파일에 나뉘어 있어도(강의실별 등) 빠지지 않고,
+  // 같은 학생이 두 번 나오면(같은 파일을 두 번 올린 경우) 나중 파일 것 하나만 남긴다.
+  const byId = new Map<string, Student>()
+  const classInfo = new Map<string, { header: ExamHeader; files: Set<string> }>()
+  let dupCount = 0
+  const dupFiles = new Set<string>()
   for (const a of answers) {
-    const byClass = new Map<string, Student[]>()
-    for (const s of a.students) byClass.set(s.classNo, [...(byClass.get(s.classNo) ?? []), s])
-    for (const [classNo, students] of byClass) {
-      if (classMap.has(classNo)) {
-        warnings.push({ level: 'warn', code: 'duplicate-class', message: `${classNo}반 정오표가 두 번 올라와 나중 파일(${a.fileName})로 바꿨습니다.` })
+    for (const s of a.students) {
+      if (byId.has(s.id)) {
+        dupCount++
+        dupFiles.add(a.fileName)
       }
-      classMap.set(classNo, { classNo, header: a.header, students, source: { fileName: a.fileName } })
+      byId.set(s.id, s)
+      const info = classInfo.get(s.classNo) ?? { header: a.header, files: new Set<string>() }
+      info.files.add(a.fileName)
+      classInfo.set(s.classNo, info)
     }
   }
-  const classes = [...classMap.values()].sort((x, y) => Number(x.classNo) - Number(y.classNo))
+  if (dupCount) {
+    warnings.push({ level: 'warn', code: 'duplicate-students', message: `같은 학생(반/번호)이 두 번 이상 나옵니다(${dupCount}명). 같은 반 파일을 두 번 올린 것 같아 한 번만 셉니다.`, details: [...dupFiles] })
+  }
+  const classes: ClassRoster[] = [...classInfo.entries()]
+    .map(([classNo, info]) => ({
+      classNo,
+      header: info.header,
+      students: [...byId.values()].filter((s) => s.classNo === classNo).sort((x, y) => x.seatNo - y.seatNo),
+      source: { fileName: [...info.files].join(', ') },
+    }))
+    .sort((x, y) => Number(x.classNo) - Number(y.classNo))
+  const splitClasses = classes.filter((c) => (classInfo.get(c.classNo)?.files.size ?? 0) > 1 && c.students.length > 0)
+  if (splitClasses.length && !dupCount) {
+    warnings.push({ level: 'info', code: 'class-split-files', message: `여러 파일에 나뉘어 있던 반을 합쳤습니다: ${splitClasses.map((c) => `${c.classNo}반`).join(', ')}` })
+  }
+  const idSeen = new Map<string, string>()
   const dupIds: string[] = []
   for (const c of classes)
     for (const s of c.students) {
@@ -112,7 +193,7 @@ export function buildExam(files: ParsedFile[]): BuildResult {
       if (prev && prev !== s.id) dupIds.push(`${s.studentId} (${prev}, ${s.id})`)
       idSeen.set(s.studentId, s.id)
     }
-  if (dupIds.length) warnings.push({ level: 'warn', code: 'duplicate-student-id', message: `같은 학번이 여러 번 나타납니다 (${dupIds.length}건).`, details: dupIds.slice(0, 10) })
+  if (dupIds.length) warnings.push({ level: 'warn', code: 'duplicate-student-id', message: `같은 학번이 서로 다른 반/번호에 나타납니다 (${dupIds.length}건).`, details: dupIds.slice(0, 10) })
 
   // 만점
   const mcSum = mcItems.reduce((s, i) => s + i.points, 0)
@@ -126,10 +207,16 @@ export function buildExam(files: ParsedFile[]): BuildResult {
   }
   if (Math.abs(maxima.mc - mcSum) > 0.005) warnings.push({ level: 'warn', code: 'mc-max-mismatch', message: `선택형 만점(${maxima.mc})과 문항 배점 합(${mcSum})이 다릅니다. 정오표의 배점 행을 확인해 주세요.` })
   if (crItems.length && Math.abs(maxima.cr - crSum) > 0.005) warnings.push({ level: 'warn', code: 'cr-max-mismatch', message: `서답형 만점(${maxima.cr})과 추가한 서답형 열의 배점 합(${crSum})이 다릅니다.` })
+  if (!(maxima.total > 0)) errors.push({ level: 'error', code: 'no-max', message: '과목 만점을 알 수 없습니다(정오표 배점 행의 영역총점이 비어 있음).' })
+
+  const examHeader: ExamHeader = { ...ref.header }
+  delete examHeader.classNo
 
   // 정답/배점표 보강
   const answerKey = files.find((f) => f.answerKey)?.answerKey
   if (answerKey) {
+    const conflicts = headerConflicts(examHeader, answerKey.header).filter((x) => x === '교과목')
+    if (conflicts.length) warnings.push({ level: 'warn', code: 'answerkey-subject', message: `정답/배점표(${answerKey.fileName})의 교과목(${answerKey.header.subject})이 정오표(${examHeader.subject})와 다릅니다. 다른 과목 파일이 아닌지 확인해 주세요.` })
     const akMc = answerKey.items.filter((i) => i.kind === 'mc')
     const diffs: string[] = []
     if (akMc.length !== mcItems.length) diffs.push(`문항 수 정오표 ${mcItems.length} vs 정답배점표 ${akMc.length}`)
@@ -154,6 +241,8 @@ export function buildExam(files: ParsedFile[]): BuildResult {
   const itemInfo = files.find((f) => f.itemInfo)?.itemInfo
   let standards: Standard[] = []
   if (itemInfo) {
+    const conflicts = headerConflicts(examHeader, itemInfo.header).filter((x) => x === '교과목')
+    if (conflicts.length) warnings.push({ level: 'warn', code: 'iteminfo-subject', message: `문항정보표(${itemInfo.fileName})의 교과목(${itemInfo.header.subject})이 정오표(${examHeader.subject})와 다릅니다. 다른 과목 파일이 아닌지 확인해 주세요.` })
     const iiMc = itemInfo.items.filter((i) => i.kind === 'mc')
     const diffs: string[] = []
     if (iiMc.length !== mcItems.length) diffs.push(`문항 수 정오표 ${mcItems.length} vs 문항정보표 ${iiMc.length}`)
@@ -179,37 +268,54 @@ export function buildExam(files: ParsedFile[]): BuildResult {
       it.standards = [...ii.standards]
     })
     if (diffs.length) warnings.push({ level: 'warn', code: 'iteminfo-mismatch', message: `문항정보표(${itemInfo.fileName})가 정오표와 다른 부분이 있습니다. 정오표 기준으로 분석합니다.`, details: diffs })
-    // 성취기준: 정오표에 실제로 있는 문항만 연결
-    const present = new Set(items.map((i) => `${i.kind}:${i.no}`))
-    standards = itemInfo.standards
-      .map((s) => ({
-        ...s,
-        itemNos: s.itemNos.filter((n, i, arr) => arr.indexOf(n) === i && (present.has(`mc:${n}`) || present.has(`cr:${n}`))),
-      }))
-      .filter((s) => s.itemNos.length > 0)
+    // 성취기준: 실제로 분석되는 문항에 연결된 것만
+    const used = new Set(items.flatMap((i) => i.standards))
+    standards = itemInfo.standards.filter((s) => used.has(s.code)).map((s) => ({ ...s, itemNos: items.filter((i) => i.standards.includes(s.code)).map((i) => i.no) }))
     if (iiCr.length && crItems.length === 0) {
       warnings.push({ level: 'info', code: 'cr-totals-only', message: `문항정보표에 서답형 ${iiCr.length}문항이 있지만 정오표에는 서답형 총점만 있어 서답형은 총점으로만 분석합니다. 문항별 분석을 원하면 정오표에 "서답1, 서답2…" 열을 추가해 올려 주세요.` })
     }
+    if (!examHeader.subject && itemInfo.header.subject) examHeader.subject = itemInfo.header.subject
   }
 
-  // 문항분석표 (학년 전체 비교용)
-  const itemAnalysis = files.find((f) => f.itemAnalysis)?.itemAnalysis
-  let gradeReference: Exam['gradeReference']
-  if (itemAnalysis) {
-    if (itemAnalysis.items.length !== mcItems.length) {
-      warnings.push({ level: 'warn', code: 'itemanalysis-mismatch', message: `문항분석표(${itemAnalysis.fileName})의 문항 수(${itemAnalysis.items.length})가 정오표(${mcItems.length})와 달라 학년 전체 비교에 쓰지 않습니다.` })
+  // 문항분석표 (학년 전체 비교용): 반 수치를 같은 반 정오표와 대조해 같은 시험인지 확인한다.
+  let gradeReference: GradeReference | undefined
+  const iaFiles = files.filter((f) => f.itemAnalysis).map((f) => f.itemAnalysis!)
+  const checked: { ia: ItemAnalysisParse; check: IaCheck; conflicts: string[] }[] = []
+  for (const ia of iaFiles) {
+    if (ia.items.length !== mcItems.length) {
+      warnings.push({ level: 'warn', code: 'itemanalysis-mismatch', message: `문항분석표(${ia.fileName})의 문항 수(${ia.items.length})가 정오표(${mcItems.length})와 달라 학년 전체 비교에 쓰지 않습니다. 다른 시험의 문항분석표인지 확인해 주세요.` })
+      continue
+    }
+    checked.push({ ia, check: verifyItemAnalysis(ia, mcItems, classes), conflicts: headerConflicts(examHeader, ia.header) })
+  }
+  const chosen = checked.find((c) => c.check.status === 'verified') ?? checked.find((c) => c.check.status === 'unverifiable' && c.conflicts.length === 0)
+  for (const c of checked) {
+    if (c === chosen) continue
+    if (c.check.status === 'mismatch') {
+      warnings.push({
+        level: 'warn',
+        code: 'itemanalysis-class-mismatch',
+        message: `문항분석표(${c.ia.fileName})의 ${c.ia.classNo}반 수치가 ${c.ia.classNo}반 정오표와 다릅니다. 다른 시험의 문항분석표로 보여 학년 전체 비교에 쓰지 않았습니다.`,
+        details: c.check.details.slice(0, 15),
+      })
+    } else if (c.conflicts.length) {
+      warnings.push({ level: 'warn', code: 'itemanalysis-header', message: `문항분석표(${c.ia.fileName})의 ${c.conflicts.join('·')}이(가) 정오표와 달라 학년 전체 비교에 쓰지 않았습니다.` })
+    }
+  }
+  if (chosen) {
+    const ia = chosen.ia
+    gradeReference = { source: ia.fileName, header: ia.header, classNo: ia.classNo, items: ia.items, verified: chosen.check.status === 'verified' ? true : undefined }
+    if (chosen.check.status === 'verified') {
+      warnings.push({ level: 'info', code: 'itemanalysis-verified', message: `문항분석표(${ia.classNo}반)의 반 수치가 ${ia.classNo}반 정오표와 ${ia.items.length}문항 모두 일치합니다. 학년 전체 ${ia.gradeN ?? '?'}명 수치를 비교에 사용합니다.` })
     } else {
-      gradeReference = { source: itemAnalysis.fileName, header: itemAnalysis.header, items: itemAnalysis.items }
+      warnings.push({ level: 'info', code: 'itemanalysis-unverified', message: `문항분석표${ia.classNo ? `(${ia.classNo}반)` : ''}와 같은 반의 정오표가 없어 반 수치는 대조하지 못했습니다. 학년 전체 ${ia.gradeN ?? '?'}명 수치를 비교에 사용합니다.` })
     }
   }
 
-  const header: ExamHeader = { ...ref.header }
-  delete header.classNo
-  if (!header.subject && itemInfo?.header.subject) header.subject = itemInfo.header.subject
-  if (!header.examName && (answerKey?.header.examName || itemInfo?.header.examName)) header.examName = answerKey?.header.examName ?? itemInfo?.header.examName
+  if (!examHeader.examName && (answerKey?.header.examName || itemInfo?.header.examName)) examHeader.examName = answerKey?.header.examName ?? itemInfo?.header.examName
 
   const exam: Exam = {
-    header,
+    header: examHeader,
     items,
     maxima,
     classes,
@@ -219,5 +325,6 @@ export function buildExam(files: ParsedFile[]): BuildResult {
     warnings,
     sources: files.map((f) => f.fileName),
   }
+  if (errors.length) return { exam: null, errors, warnings }
   return { exam, errors, warnings }
 }

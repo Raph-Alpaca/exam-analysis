@@ -53,11 +53,20 @@ export function parseLegendRow(text: string): MultiLegend | null {
 
 const RE_INT = /^\d+$/
 const RE_LETTER = /^[A-Za-z]$/
+const CIRCLED: Record<string, string> = { '①': '1', '②': '2', '③': '3', '④': '4', '⑤': '5' }
+
+/** ①~⑤ 같은 원문자와 전각 숫자를 보통 숫자로 */
+function normalizeCell(raw: string): string {
+  return raw
+    .trim()
+    .replace(/[①-⑤]/g, (c) => CIRCLED[c] ?? c)
+    .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+}
 
 export function decodeResponse(raw: string, legend: MultiLegend = DEFAULT_MULTI_CODES): Response {
-  const s = raw.trim()
+  const s = normalizeCell(raw)
   if (s === '' || s === '-' || s === '－' || s === '—') return { k: 'blank' }
-  if (s === '.' || s === '．' || s === '○' || s === 'O') return { k: 'correct' }
+  if (s === '.' || s === '．' || s === '·') return { k: 'correct' }
   if (RE_INT.test(s)) {
     const n = Number(s)
     if (n >= 1 && n <= 5) return { k: 'wrong', choice: n }
@@ -71,7 +80,7 @@ export function decodeResponse(raw: string, legend: MultiLegend = DEFAULT_MULTI_
 }
 
 export function decodeKey(raw: string, legend: MultiLegend = DEFAULT_MULTI_CODES): { key: number[]; keyMode: KeyMode } | null {
-  const s = raw.trim()
+  const s = normalizeCell(raw)
   if (s === '' || s === '-') return null
   if (RE_INT.test(s)) {
     const n = Number(s)

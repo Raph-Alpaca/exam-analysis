@@ -17,6 +17,8 @@ export interface Settings {
   standardPassPct: number
   /** 올린 반들이 학년 전체인지 (학년 전체 비교 열의 출처 결정) */
   uploadedIsWholeGrade: boolean
+  /** 선다형 응답이 하나도 없는 학생(결시·미응시)을 분석에서 뺄지 */
+  excludeNoResponse: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -26,6 +28,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sdMode: 'population',
   standardPassPct: 80,
   uploadedIsWholeGrade: false,
+  excludeNoResponse: true,
 }
 
 export function validateCutoffs(c: Cutoffs): string | null {

@@ -1,4 +1,4 @@
-import type { CellGrid } from '../xlsx/readWorkbook'
+import { DRM_HINT, type CellGrid } from '../xlsx/readWorkbook'
 import { detectKind, type FileKind } from './detect'
 import { parseAnswerSheet } from './answerSheet'
 import { parseItemInfo } from './itemInfo'
@@ -26,7 +26,7 @@ export function parseGrids(grids: CellGrid[], fileName: string): ParsedFile {
       break
     }
   }
-  if (!grid) return { fileName, kind: 'unknown', error: '정오표·문항정보표·정답배점표·문항분석표 중 어느 것인지 알 수 없는 파일입니다.' }
+  if (!grid) return { fileName, kind: 'unknown', error: `학생답 정오표·문항정보표·정답배점표·문항분석표가 아닌 파일입니다. NEIS에서 받은 파일이 맞다면 ${DRM_HINT}` }
   try {
     switch (kind) {
       case 'answers':

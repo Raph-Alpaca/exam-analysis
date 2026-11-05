@@ -8,6 +8,7 @@ import { crItemsOf, mcItemsOf, scoreStudents, type Scored } from './scoring'
 import { computeStandards } from './standards'
 import { computeConstructed } from './constructed'
 import { computeStudentResults } from './students'
+import { describeStudent, partitionStudents } from './inclusion'
 
 export const HISTOGRAM_BIN = 5
 
@@ -48,10 +49,35 @@ export interface AnalyzeOptions {
 /** 시험 전체 분석. 순수 함수 — 설정이 바뀌면 다시 호출한다. */
 export function analyze(exam: Exam, settings: Settings, opts: AnalyzeOptions = {}): AnalysisResult {
   const classes = opts.classFilter?.length ? exam.classes.filter((c) => opts.classFilter!.includes(c.classNo)) : exam.classes
-  const students: Student[] = classes.flatMap((c) => c.students)
+  const part = partitionStudents(
+    classes.flatMap((c) => c.students),
+    settings,
+  )
+  const students: Student[] = part.included
   const scored = scoreStudents(exam, students, settings)
   const levels = scored.map((s) => levelOf(s, exam, settings))
   const warnings: Warning[] = []
+
+  if (part.excluded.length) {
+    const withScore = part.excluded.filter((s) => s.neis.total > 0).length
+    warnings.push({
+      level: 'warn',
+      code: 'no-response-excluded',
+      message: `선다형 응답이 하나도 없는 학생 ${part.excluded.length}명은 결시·미응시로 보고 분석에서 뺐습니다${withScore ? ` (그중 ${withScore}명은 점수만 있어 결시 인정점으로 보입니다)` : ''}. 포함하려면 설정에서 바꾸세요.`,
+      details: part.excluded.map(describeStudent),
+    })
+  }
+  if (part.noResponseIncluded.length) {
+    warnings.push({
+      level: 'info',
+      code: 'no-response-included',
+      message: `선다형 응답이 하나도 없는 학생 ${part.noResponseIncluded.length}명을 설정에 따라 분석에 포함했습니다.`,
+      details: part.noResponseIncluded.map(describeStudent),
+    })
+  }
+  if (students.length === 0) {
+    warnings.push({ level: 'error', code: 'no-students', message: '분석할 학생이 없습니다. 올린 정오표와 학급 선택을 확인해 주세요.' })
+  }
 
   const mismatched = scored.filter((s) => Math.abs(s.recomputed - s.student.neis.total) > 0.005)
   if (mismatched.length) {

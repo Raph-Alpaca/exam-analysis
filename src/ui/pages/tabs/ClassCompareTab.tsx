@@ -7,7 +7,7 @@ import { heatStyle, LEVEL_COLORS } from '../../theme/levels'
 import { LevelLegend, SectionTitle } from '../../components/basic'
 import { DataTable, type Column } from '../../components/DataTable'
 import { LevelStackedBar } from '../../charts/charts'
-import { neisCounts } from '../../../stats/neisTable'
+import { buildNeisTable, usesGradeReference, type NeisTableRow } from '../../../stats/neisTable'
 
 type ClassRow = { name: string; g: GroupStats }
 
@@ -42,8 +42,9 @@ export function ClassStatsTable({ result, caption }: { result: AnalysisResult; c
 export function useGradeReference(exam: Exam) {
   const settings = useAppStore((s) => s.settings)
   const full = useFullAnalysis()
-  const useRef = !!exam.gradeReference && !settings.uploadedIsWholeGrade
-  const label = useRef ? `학년 전체 (문항분석표, ${exam.gradeReference!.items[0]?.gradeN ?? '?'}명)` : settings.uploadedIsWholeGrade ? `학년 전체 (올린 반 합계, ${full?.overview.n ?? 0}명)` : `올린 반 합계 (${full?.overview.n ?? 0}명)`
+  const useRef = usesGradeReference(exam, settings)
+  const gradeN = exam.gradeReference?.items.find((i) => i.gradeN > 0)?.gradeN
+  const label = useRef ? `학년 전체 (문항분석표, ${gradeN ?? '?'}명)` : settings.uploadedIsWholeGrade ? `학년 전체 (올린 반 합계, ${full?.overview.n ?? 0}명)` : `올린 반 합계 (${full?.overview.n ?? 0}명)`
   const pOf = (no: number): number | null => {
     if (useRef) return exam.gradeReference!.items.find((i) => i.no === no)?.gradeP ?? null
     return full?.items.find((i) => i.no === no)?.p ?? null
@@ -73,45 +74,21 @@ export function ItemByClassTable({ exam, result, caption }: { exam: Exam; result
 
 export function NeisItemTable({ exam, classNo }: { exam: Exam; classNo: string }) {
   const settings = useAppStore((s) => s.settings)
-  const cls = exam.classes.find((c) => c.classNo === classNo)
-  const useRef = !!exam.gradeReference && !settings.uploadedIsWholeGrade
-  const rows = useMemo(() => {
-    if (!cls) return []
-    const own = neisCounts(exam, cls.students)
-    const all = neisCounts(
-      exam,
-      exam.classes.flatMap((c) => c.students),
-    )
-    return own.map((r, i) => {
-      const ref = useRef ? exam.gradeReference!.items.find((x) => x.no === r.no) : undefined
-      const g = all[i]!
-      const gradeCounts = ref ? ref.gradeCounts : { ...g.counts, none: g.blank + g.multi }
-      return {
-        no: r.no,
-        key: r.key,
-        cells: CHOICES.map((c) => `${r.counts[c]}(${gradeCounts[c]})`),
-        sum: r.sum,
-        p: `${r.p == null ? '-' : r.p.toFixed(2)}(${ref ? (ref.gradeP == null ? '-' : ref.gradeP.toFixed(2)) : g.p == null ? '-' : g.p.toFixed(2)})`,
-        blank: ref ? `${r.blank}(${ref.gradeCounts.none})` : `${r.blank}(${g.blank})`,
-        multi: ref ? `${r.multi}(—)` : `${r.multi}(${g.multi})`,
-      }
-    })
-  }, [exam, cls, useRef])
-  type Row = (typeof rows)[number]
+  const table = useMemo(() => buildNeisTable(exam, classNo, settings), [exam, classNo, settings])
+  if (!table) return null
+  type Row = NeisTableRow
   const cols: Column<Row>[] = [
     { id: 'no', header: '문항번호', accessor: (r) => r.no, align: 'center' },
     ...CHOICES.map((c, i): Column<Row> => ({ id: `c${c}`, header: `${c}번`, group: '답안번호 (반 인원 / 괄호 안: 전체)', cell: (r) => r.cells[i], align: 'center', cellClass: (r) => (r.key.includes(c) ? 'key' : undefined) })),
     { id: 'sum', header: '합계', accessor: (r) => r.sum, align: 'center' },
-    { id: 'key', header: '정답', cell: (r) => r.key.join(','), align: 'center' },
+    { id: 'key', header: '정답', cell: (r) => r.keyText, align: 'center' },
     { id: 'p', header: '정답률(%)', cell: (r) => r.p, align: 'center' },
     { id: 'blank', header: '무표기', cell: (r) => r.blank, align: 'center' },
     { id: 'multi', header: '중복표기', cell: (r) => r.multi, align: 'center' },
   ]
-  if (!cls) return null
-  const gradeLabel = useRef ? `학년 전체 ${exam.gradeReference!.items[0]?.gradeN ?? '?'}명 (문항분석표)` : `올린 반 합계 ${exam.classes.reduce((a, c) => a + c.students.length, 0)}명`
-  return (
-    <DataTable columns={cols} rows={rows} rowKey={(r) => String(r.no)} caption={`${classNo}반 문항분석표 (NEIS 양식 재구성) · 괄호 안: ${gradeLabel}${useRef ? ' · 중복표기 전체값은 문항분석표의 무표기와 합산되어 무표기 칸에 표시' : ''}`} compact />
-  )
+  const ref = exam.gradeReference
+  const note = table.usesReference && ref?.verified && ref.classNo ? ` · 올린 문항분석표(${ref.classNo}반)와 대조 완료` : ''
+  return <DataTable columns={cols} rows={table.rows} rowKey={(r) => String(r.no)} caption={`${classNo}반 문항분석표 (NEIS 양식 재구성, ${table.n}명) · 괄호 안: ${table.gradeLabel}${note}`} compact />
 }
 
 export function ClassCompareTab({ exam, result }: { exam: Exam; result: AnalysisResult }) {

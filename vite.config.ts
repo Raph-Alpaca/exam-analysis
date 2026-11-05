@@ -11,6 +11,9 @@ export default defineConfig({
   build: { target: 'es2022' },
   test: {
     environment: 'node',
-    include: ['test/**/*.test.ts'],
+    include: ['test/**/*.test.ts', 'test/**/*.test.tsx'],
+    exclude: ['test/_probe/**', 'node_modules/**'],
+    // 첫 실행 때 엑셀 라이브러리(ExcelJS) 로딩이 수 초 걸릴 수 있어 넉넉히
+    testTimeout: 60000,
   },
 })

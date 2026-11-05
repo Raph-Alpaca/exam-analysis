@@ -80,9 +80,13 @@ export function parseAnswerKey(grid: CellGrid, fileName: string): AnswerKeyParse
         let key = kind === 'mc' ? decodeKey(keyText) : null
         if (kind === 'mc' && multiText) {
           const extra = decodeKey(multiText)
-          const union = new Set<number>([...(key?.key ?? []), ...(extra?.key ?? [])])
-          if (union.size >= 1) key = { key: [...union].sort(), keyMode: 'any' }
-          warnings.push({ level: 'info', code: 'multi-key', message: `${fileName}: ${no}번 문항에 복수구분("${multiText}")이 있어 ${[...union].join(',')}번을 모두 정답으로 봅니다.` })
+          if (extra) {
+            const union = new Set<number>([...(key?.key ?? []), ...extra.key])
+            key = { key: [...union].sort((a, b) => a - b), keyMode: 'any' }
+            warnings.push({ level: 'info', code: 'multi-key', message: `${fileName}: ${no}번 문항에 복수구분("${multiText}")이 있어 ${key.key.join(',')}번을 모두 정답으로 봅니다.` })
+          } else {
+            warnings.push({ level: 'info', code: 'multi-key', message: `${fileName}: ${no}번 문항에 복수구분 표시("${multiText}")가 있습니다. 채점은 정오표(NEIS 채점 결과) 기준으로 합니다.` })
+          }
         }
         if (kind === 'mc' && !key) warnings.push({ level: 'warn', code: 'answerkey-no-key', message: `${fileName}: ${no}번 문항의 정답("${keyText}")을 읽지 못했습니다.` })
         items.push({

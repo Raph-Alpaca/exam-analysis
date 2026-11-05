@@ -88,6 +88,16 @@ export function SettingsPanel() {
       </section>
 
       <section className="stack-sm">
+        <h3>결시·미응시</h3>
+        <label className="checkbox">
+          <input type="checkbox" checked={settings.excludeNoResponse} onChange={(e) => setSettings({ excludeNoResponse: e.target.checked })} />
+          <span>
+            선다형 응답이 하나도 없는 학생은 분석에서 뺍니다 <span className="muted small">— 결시생이 0점으로 섞여 평균·성취수준 비율·신뢰도가 왜곡되는 것을 막습니다. 뺀 학생은 개요 탭 안내에 이름이 나옵니다.</span>
+          </span>
+        </label>
+      </section>
+
+      <section className="stack-sm">
         <h3>학년 전체 비교</h3>
         <label className="checkbox">
           <input type="checkbox" checked={settings.uploadedIsWholeGrade} onChange={(e) => setSettings({ uploadedIsWholeGrade: e.target.checked })} />

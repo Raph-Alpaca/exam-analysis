@@ -79,8 +79,13 @@ export interface Warning {
 export interface GradeItemRef {
   no: number
   key: number | null
+  /** 답지별 인원. none = 무표기 + 중복표기 */
   classCounts: Record<ChoiceKey, number>
   gradeCounts: Record<ChoiceKey, number>
+  classBlank: number
+  classMulti: number
+  gradeBlank: number
+  gradeMulti: number
   classN: number
   gradeN: number
   classP: number | null
@@ -89,7 +94,11 @@ export interface GradeItemRef {
 export interface GradeReference {
   source: string
   header?: ExamHeader
+  /** 문항분석표가 어느 반 것인지 (제목 행의 마지막 숫자) */
+  classNo?: string
   items: GradeItemRef[]
+  /** 같은 반 정오표와 반 수치를 대조해 모두 일치했는지 (정오표가 없으면 undefined) */
+  verified?: boolean
 }
 
 export interface Exam {

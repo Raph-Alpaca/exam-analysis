@@ -127,10 +127,39 @@ export function gridFromSheet(name: string, ws: WorkSheet): CellGrid {
   return new CellGrid(name, ws)
 }
 
+export const DRM_HINT = '학교 문서보안(DRM)이 걸린 파일은 브라우저에서 열 수 없습니다. 문서보안을 해제(복호화)한 파일을 올려 주세요.'
+
+/** 파일 앞부분으로 형식 추정: zip(xlsx) / ole(xls·암호 xlsx) / text(html·csv) / drm(문서보안 등 알 수 없는 바이너리) */
+export function sniffFormat(bytes: Uint8Array): 'zip' | 'ole' | 'text' | 'drm' | 'empty' {
+  if (bytes.length === 0) return 'empty'
+  if (bytes[0] === 0x50 && bytes[1] === 0x4b) return 'zip'
+  if (bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0) return 'ole'
+  const head = new TextDecoder('latin1').decode(bytes.subarray(0, 1024))
+  if (/FASOO|SCDSA|DOCUMENT SAFER|MarkAny|DRMONE|<##/i.test(head)) return 'drm'
+  let printable = 0
+  const n = Math.min(bytes.length, 1024)
+  for (let i = 0; i < n; i++) {
+    const b = bytes[i]!
+    if (b === 9 || b === 10 || b === 13 || b >= 32) printable++
+  }
+  return printable / n > 0.95 ? 'text' : 'drm'
+}
+
 /** ArrayBuffer/Uint8Array → 시트별 CellGrid (xlsx·xls 모두 가능) */
 export async function readWorkbookData(data: ArrayBuffer | Uint8Array, fileName: string): Promise<CellGrid[]> {
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
+  const fmt = sniffFormat(bytes)
+  if (fmt === 'empty') throw new Error('빈 파일입니다.')
+  if (fmt === 'drm') throw new Error(`엑셀 파일 형식이 아닙니다. ${DRM_HINT}`)
   const XLSX = await import('xlsx')
-  const wb = XLSX.read(data, { type: 'array', cellText: true, cellDates: false })
+  let wb: ReturnType<typeof XLSX.read>
+  try {
+    wb = XLSX.read(bytes, { type: 'array', cellText: true, cellDates: false })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (/password|encrypt/i.test(msg)) throw new Error('암호가 걸린 엑셀 파일입니다. 엑셀에서 암호를 해제하고 저장한 뒤 올려 주세요.')
+    throw new Error(`엑셀 파일을 읽지 못했습니다. ${DRM_HINT} (${msg})`)
+  }
   return wb.SheetNames.map((n) => gridFromSheet(`${fileName}:${n}`, wb.Sheets[n]!))
 }
 

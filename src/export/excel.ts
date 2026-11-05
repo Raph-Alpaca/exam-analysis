@@ -3,7 +3,7 @@ import { CHOICES, LEVELS, type AnalysisResult, type Exam, type GroupStats, type 
 import type { Settings } from '../model/settings'
 import { discBand } from '../model/thresholds'
 import { describeHeader } from '../parsers/header'
-import { neisCounts } from '../stats/neisTable'
+import { buildNeisTable } from '../stats/neisTable'
 
 type Cell = string | number | null | undefined
 type Workbook = ExcelJSNS.Workbook
@@ -289,20 +289,11 @@ export async function buildWorkbook(exam: Exam, result: AnalysisResult, settings
   // 6. 문항분석표_재구성 (NEIS 양식)
   {
     const ws = wb.addWorksheet('문항분석표_재구성')
-    const useRef = !!exam.gradeReference && !settings.uploadedIsWholeGrade
-    const allStudents = exam.classes.flatMap((c) => c.students)
-    const gradeLabel = useRef ? `학년 전체 (문항분석표 ${exam.gradeReference!.items[0]?.gradeN ?? '?'}명)` : `올린 반 합계 (${allStudents.length}명)`
-    let r = addTitle(ws, '문항분석표 (NEIS 양식 재구성)', `${meta} · 괄호 안 = ${gradeLabel}`, 12)
-    const all = neisCounts(exam, allStudents)
-    for (const cls of exam.classes) {
-      const own = neisCounts(exam, cls.students)
-      const rows: Cell[][] = own.map((x, i) => {
-        const ref = useRef ? exam.gradeReference!.items.find((y) => y.no === x.no) : undefined
-        const g = all[i]!
-        const gc = ref ? ref.gradeCounts : { ...g.counts, none: g.blank + g.multi }
-        return [x.no, ...CHOICES.map((c) => `${x.counts[c]}(${gc[c]})`), x.sum, x.key.join(','), `${x.p == null ? '-' : x.p.toFixed(2)}(${ref ? (ref.gradeP == null ? '-' : ref.gradeP.toFixed(2)) : g.p == null ? '-' : g.p.toFixed(2)})`, ref ? `${x.blank}(${ref.gradeCounts.none})` : `${x.blank}(${g.blank})`, ref ? `${x.multi}(-)` : `${x.multi}(${g.multi})`]
-      })
-      r = addTable(ws, r, { columns: [{ header: '문항번호', width: 9 }, ...CHOICES.map((c) => ({ header: `${c}번`, group: '답안번호', width: 10 })), { header: '합계', width: 7 }, { header: '정답', width: 6 }, { header: '정답률(%)', width: 16 }, { header: '무표기', width: 9 }, { header: '중복표기', width: 9 }], rows }, `${cls.classNo}반 (${cls.students.length}명)`)
+    const tables = exam.classes.map((c) => buildNeisTable(exam, c.classNo, settings)).filter((t): t is NonNullable<typeof t> => t != null)
+    let r = addTitle(ws, '문항분석표 (NEIS 양식 재구성)', `${meta} · 괄호 안 = ${tables[0]?.gradeLabel ?? ''}`, 12)
+    for (const t of tables) {
+      const rows: Cell[][] = t.rows.map((x) => [x.no, ...x.cells, x.sum, x.keyText, x.p, x.blank, x.multi])
+      r = addTable(ws, r, { columns: [{ header: '문항번호', width: 9 }, ...CHOICES.map((c) => ({ header: `${c}번`, group: '답안번호', width: 10 })), { header: '합계', width: 7 }, { header: '정답', width: 6 }, { header: '정답률(%)', width: 16 }, { header: '무표기', width: 9 }, { header: '중복표기', width: 9 }], rows }, `${t.classNo}반 (${t.n}명)`)
     }
   }
 
@@ -389,7 +380,8 @@ export async function buildWorkbook(exam: Exam, result: AnalysisResult, settings
 
 export function exportFileName(exam: Exam): string {
   const h = exam.header
-  const parts = ['성취평가분석', h.year ? `${h.year}학년도` : '', h.grade ? `${h.grade}학년` : '', h.semester ? `${h.semester}학기` : '', h.examName ?? '', h.subject ?? ''].filter(Boolean)
+  const exam_ = h.examName && h.grade && h.examName.replace(/\s+/g, '').startsWith(`${h.grade}학년`) ? h.examName.replace(/^\s*\d\s*학년\s*/, '') : (h.examName ?? '')
+  const parts = ['성취평가분석', h.year ? `${h.year}학년도` : '', h.grade ? `${h.grade}학년` : '', h.semester ? `${h.semester}학기` : '', exam_, h.subject ?? ''].filter(Boolean)
   return parts.join('_').replace(/[\\/:*?"<>|]/g, '') + '.xlsx'
 }
 

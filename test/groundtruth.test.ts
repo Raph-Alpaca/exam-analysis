@@ -13,6 +13,7 @@ import { buildExam, parseGrids, type ParsedFile } from '../src/parsers/index'
 import { analyze } from '../src/stats/analyze'
 import { DEFAULT_SETTINGS } from '../src/model/settings'
 import { buildWorkbook, exportFileName } from '../src/export/excel'
+import { buildNeisTable } from '../src/stats/neisTable'
 
 const root = process.env.NEIS_SAMPLE_DIR
 const dirs: string[] = []
@@ -122,6 +123,43 @@ run('실제 NEIS 샘플 (NEIS_SAMPLE_DIR)', () => {
         const buf = await wb.xlsx.writeBuffer()
         expect(buf.byteLength).toBeGreaterThan(10000)
         if (process.env.NEIS_EXPORT_DIR) writeFileSync(join(process.env.NEIS_EXPORT_DIR, exportFileName(exam!)), Buffer.from(buf))
+      })
+
+      it('문항분석표가 있으면 사이트의 재구성 표가 원본 문항분석표와 모든 칸에서 같다', async () => {
+        const parsed = await loadDir(dir)
+        const iaFile = parsed.find((p) => p.itemAnalysis)
+        if (!iaFile) return
+        const { exam, warnings } = buildExam(parsed)
+        expect(warnings.some((w) => w.code === 'itemanalysis-verified')).toBe(true)
+        const ref = exam!.gradeReference!
+        expect(ref.verified).toBe(true)
+        const table = buildNeisTable(exam!, ref.classNo!, DEFAULT_SETTINGS)!
+        // 원본 파일을 파서와 별개로 직접 읽는다: 머리글 행에서 열 위치를 찾고, 빈 무표기·중복표기 칸은 같은 페이지 위 값
+        const grid = (await readWorkbookData(readFileSync(join(dir, iaFile.fileName)), iaFile.fileName))[0]!
+        const raw: Record<number, string[]> = {}
+        let cols: number[] | null = null
+        let last: [string, string] = ['0(0)', '0(0)']
+        for (let r = 1; r <= grid.rows; r++) {
+          const t = grid.rowTexts(r).map((x) => x.replace(/\s+/g, ''))
+          if (t.includes('1번') && t.some((x) => x.includes('문항번호'))) {
+            const idx = (re: RegExp) => t.findIndex((x) => re.test(x)) + 1
+            cols = [idx(/문항번호/), idx(/^1번$/), idx(/^2번$/), idx(/^3번$/), idx(/^4번$/), idx(/^5번$/), idx(/^합계$/), idx(/^정답$/), idx(/정답률/), idx(/무표기/), idx(/중복표기/)]
+            last = ['0(0)', '0(0)']
+            continue
+          }
+          if (!cols) continue
+          const no = grid.int(r, cols[0]!)
+          if (no == null || !/^\d+\(\d+\)$/.test(t[cols[1]! - 1] ?? '')) continue
+          const blank = t[cols[9]! - 1] || last[0]
+          const multi = t[cols[10]! - 1] || last[1]
+          last = [blank, multi]
+          raw[no] = [...[1, 2, 3, 4, 5].map((k) => t[cols![k]! - 1]!), String(grid.int(r, cols[6]!)), String(grid.int(r, cols[7]!)), t[cols[8]! - 1]!, blank, multi]
+        }
+        expect(Object.keys(raw)).toHaveLength(table.rows.length)
+        for (const row of table.rows) {
+          const ours = [...row.cells, String(row.sum), row.keyText, row.p, row.blank, row.multi]
+          expect(ours, `문항 ${row.no}`).toEqual(raw[row.no])
+        }
       })
 
       it('정답/배점표가 있으면 정오표와 정답·배점이 일치한다', async () => {

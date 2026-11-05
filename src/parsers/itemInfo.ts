@@ -18,8 +18,37 @@ interface Cols {
   stdCol: number
   pointsCol: number
   keyCol: number
-  diff: Partial<Record<Difficulty, number>>
+  /** 난이도 표시 열(○ 표시) → 난이도 */
+  diffCols: Map<number, Difficulty>
+  /** 난이도가 글자로 적힌 열 (예: "상", "보통") */
+  diffTextCol: number
 }
+
+/** 3단계·5단계·상중하 표기를 3단계 난이도로 */
+const DIFF_LABEL: Record<string, Difficulty> = {
+  어려움: '어려움',
+  매우어려움: '어려움',
+  상: '어려움',
+  중상: '어려움',
+  보통: '보통',
+  중: '보통',
+  쉬움: '쉬움',
+  매우쉬움: '쉬움',
+  하: '쉬움',
+  중하: '쉬움',
+}
+
+function diffFromText(t: string): Difficulty | undefined {
+  const s = t.replace(/\s+/g, '')
+  if (!s) return undefined
+  if (DIFF_LABEL[s]) return DIFF_LABEL[s]
+  if (/어려/.test(s)) return '어려움'
+  if (/쉬/.test(s)) return '쉬움'
+  if (/보통/.test(s)) return '보통'
+  return undefined
+}
+
+const NOT_A_MARK = new Set(['-', '0', 'X', 'x', '×'])
 
 const RE_CODE = /\[[^\]]+\]/g
 const RE_FOOTER_SLASH = /^\/$/
@@ -80,6 +109,7 @@ export function parseItemInfo(grid: CellGrid, fileName: string): ItemInfoParse {
   const stdText = new Map<number, string>() // item index → 성취기준 원문
   let cols: Cols | null = null
   let kind: 'mc' | 'cr' = 'mc'
+  let afterTotal = false
   let lastIdx = -1
   let r = 1
   while (r <= grid.rows) {
@@ -88,16 +118,26 @@ export function parseItemInfo(grid: CellGrid, fileName: string): ItemInfoParse {
     if (/문항번호/.test(joined) && /성취기준/.test(joined)) {
       const find = (re: RegExp) => texts.findIndex((t) => re.test(t.replace(/\s+/g, ''))) + 1
       const next = grid.rowTexts(r + 1)
-      const findNext = (re: RegExp) => next.findIndex((t) => re.test(t.replace(/\s+/g, ''))) + 1
+      const noCol = find(/문항번호/)
+      // 바로 아래 행이 "어려움 보통 쉬움"(또는 상/중/하) 같은 난이도 하위 머리글인지
+      const nextIsSub = grid.int(r + 1, noCol) == null && next.filter((t) => DIFF_LABEL[t.replace(/\s+/g, '')]).length >= 2
+      const diffCols = new Map<number, Difficulty>()
+      if (nextIsSub)
+        next.forEach((t, i) => {
+          const d = DIFF_LABEL[t.replace(/\s+/g, '')]
+          if (d) diffCols.set(i + 1, d)
+        })
       cols = {
-        noCol: find(/문항번호/),
-        domainCol: find(/내용영역/),
+        noCol,
+        domainCol: find(/내용영역|평가영역|단원/),
         stdCol: find(/성취기준/),
         pointsCol: find(/^배점$/),
         keyCol: find(/^정답$/),
-        diff: { 어려움: findNext(/어려움/) || undefined, 보통: findNext(/^보통$/) || undefined, 쉬움: findNext(/쉬움/) || undefined },
+        diffCols,
+        diffTextCol: diffCols.size ? 0 : find(/난이도/),
       }
-      r += Object.values(cols.diff).some(Boolean) ? 2 : 1
+      afterTotal = false
+      r += nextIsSub ? 2 : 1
       continue
     }
     if (!cols) {
@@ -105,24 +145,36 @@ export function parseItemInfo(grid: CellGrid, fileName: string): ItemInfoParse {
       continue
     }
     const first = texts.find((t) => t !== '') ?? ''
-    if (/^서답형\s*문항/.test(first)) {
+    if (/^서답형\s*문항|^서술형\s*문항|^논술형\s*문항/.test(first)) {
       kind = 'cr'
+      afterTotal = false
       r++
       continue
     }
     if (/^선택형\s*문항|^선다형\s*문항/.test(first)) {
       kind = 'mc'
+      afterTotal = false
       r++
       continue
     }
-    if (/^총\s*합\s*계/.test(first)) break
+    // 총합계·비율 행 뒤에는 새 구역 머리글이 나올 때까지 문항을 읽지 않는다 (서답형 구역이 뒤에 올 수 있음)
+    if (/^총\s*합\s*계|^소\s*계|^합\s*계|^비율/.test(first)) {
+      afterTotal = true
+      r++
+      continue
+    }
+    if (afterTotal || isFooterRow(texts)) {
+      r++
+      continue
+    }
     const no = grid.int(r, cols.noCol)
     if (no != null) {
       let difficulty: Difficulty | undefined
-      for (const d of ['어려움', '보통', '쉬움'] as Difficulty[]) {
-        const c = cols.diff[d]
-        if (c && /[○OoＯ◯●]/.test(grid.text(r, c))) difficulty = d
+      for (const [c, d] of cols.diffCols) {
+        const t = grid.text(r, c).replace(/\s+/g, '')
+        if (t && !NOT_A_MARK.has(t)) difficulty = d
       }
+      if (!difficulty && cols.diffTextCol) difficulty = diffFromText(grid.text(r, cols.diffTextCol))
       const points = cols.pointsCol ? grid.num(r, cols.pointsCol) : null
       const keyText = cols.keyCol ? grid.text(r, cols.keyCol) : ''
       const key = kind === 'mc' ? decodeKey(keyText) : null
@@ -140,10 +192,6 @@ export function parseItemInfo(grid: CellGrid, fileName: string): ItemInfoParse {
       })
       lastIdx = items.length - 1
       stdText.set(lastIdx, cols.stdCol ? grid.text(r, cols.stdCol) : '')
-      r++
-      continue
-    }
-    if (isFooterRow(texts)) {
       r++
       continue
     }
