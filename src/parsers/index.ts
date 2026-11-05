@@ -26,7 +26,7 @@ export function parseGrids(grids: CellGrid[], fileName: string): ParsedFile {
       break
     }
   }
-  if (!grid) return { fileName, kind: 'unknown', error: `학생답 정오표·문항정보표·정답배점표·문항분석표가 아닌 파일입니다. NEIS에서 받은 파일이 맞다면 ${DRM_HINT}` }
+  if (!grid) return { fileName, kind: 'unknown', error: `교과목별 학생답 정오표·문항정보표·문항분석표가 아닌 파일입니다. NEIS에서 받은 파일이 맞다면 XLS data로 다시 저장했는지 확인해 주세요. ${DRM_HINT}` }
   try {
     switch (kind) {
       case 'answers':

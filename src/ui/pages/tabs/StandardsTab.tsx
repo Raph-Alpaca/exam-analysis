@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { LEVELS, type AnalysisResult, type Exam, type StandardStats } from '../../../model/types'
 import { fmt1, fmtInt, fmtPoints } from '../../../model/format'
 import { heatStyle } from '../../theme/levels'
-import { EmptyState, SectionTitle } from '../../components/basic'
+import { EmptyState, HeatLegend, SectionTitle } from '../../components/basic'
 import { DataTable, type Column } from '../../components/DataTable'
 import { StandardAchievementBar } from '../../charts/charts'
 
@@ -49,7 +49,7 @@ export function StandardsTab({ exam, result }: { exam: Exam; result: AnalysisRes
   if (!exam.hasItemInfo || result.standards.length === 0) {
     return (
       <EmptyState>
-        <p>성취기준·내용영역 분석에는 성취기준·난이도가 들어 있는 NEIS <strong>문항정보표</strong>가 필요합니다. 정답/배점만 있는 간략형 문항정보표로는 이 탭을 만들 수 없습니다.</p>
+        <p>성취기준·내용영역 분석에는 성취기준·난이도가 들어 있는 NEIS <strong>문항정보표</strong>가 필요합니다. 정답과 배점만 있는 양식의 문항정보표로는 이 탭을 만들 수 없습니다.</p>
         <a className="btn" href="#/">
           문항정보표 추가하기
         </a>
@@ -73,8 +73,9 @@ export function StandardsTab({ exam, result }: { exam: Exam; result: AnalysisRes
               <li key={s.code}>
                 <strong>{s.code}</strong> <span className="badge badge-warn">{fmt1(s.overall.rate)}%</span>
                 <div className="small muted">{s.text}</div>
-                <div className="small">
-                  문항 {s.itemNos.join(', ')} · 수준별 {LEVELS.map((l) => `${l} ${fmt1(s.byLevel[l].rate)}`).join(' / ')}
+                <div className="small row" style={{ gap: '2px 14px' }}>
+                  <span>문항 {s.itemNos.join(', ')}</span>
+                  <span>수준별 {LEVELS.map((l) => `${l} ${fmt1(s.byLevel[l].rate)}`).join(' / ')}</span>
                 </div>
               </li>
             ))}
@@ -82,12 +83,26 @@ export function StandardsTab({ exam, result }: { exam: Exam; result: AnalysisRes
         </section>
       </div>
       <section className="card">
-        <SectionTitle title="내용영역별 분석">기존 KICE 프로그램 "평가영역별분석"과 같은 구성 (원점수·100점 환산·수준별)</SectionTitle>
+        <SectionTitle title="내용영역별 분석" right={<HeatLegend label="성취율" />}>
+          기존 KICE 프로그램 "평가영역별분석"과 같은 구성 (원점수·100점 환산·수준별)
+        </SectionTitle>
         <DataTable columns={standardColumns(result, { kind: 'domain', classes: showClasses })} rows={result.domains} rowKey={(r) => r.code} compact />
       </section>
       <section className="card">
-        <SectionTitle title="성취기준별 분석" right={result.classNos.length > 1 ? <label className="checkbox small"><input type="checkbox" checked={showClasses} onChange={(e) => setShowClasses(e.target.checked)} /> 학급별 열 보기</label> : undefined}>
-          Shiny 웹앱의 "성취수준별 성취기준 성취율"과 같은 표. 진할수록 성취율이 높습니다.
+        <SectionTitle
+          title="성취기준별 분석"
+          right={
+            <div className="row">
+              <HeatLegend label="성취율" />
+              {result.classNos.length > 1 && (
+                <label className="checkbox small">
+                  <input type="checkbox" checked={showClasses} onChange={(e) => setShowClasses(e.target.checked)} /> 학급별 열 보기
+                </label>
+              )}
+            </div>
+          }
+        >
+          Shiny 웹앱의 "성취수준별 성취기준 성취율"과 같은 표입니다. 성취율이 50%보다 낮으면 주황, 높으면 파랑으로 칠합니다.
         </SectionTitle>
         <DataTable columns={standardColumns(result, { kind: 'standard', classes: showClasses })} rows={result.standards} rowKey={(r) => r.code} compact />
       </section>

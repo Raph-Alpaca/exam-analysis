@@ -1,5 +1,16 @@
+import type { ReactNode } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { validateCutoffs } from '../../model/settings'
+
+/** 선택지 이름과 그 아래 한 줄 설명 */
+function Opt({ label, desc }: { label: ReactNode; desc?: ReactNode }) {
+  return (
+    <span className="opt">
+      <span className="opt-label">{label}</span>
+      {desc && <span className="opt-desc">{desc}</span>}
+    </span>
+  )
+}
 
 export function SettingsPanel() {
   const settings = useAppStore((s) => s.settings)
@@ -15,7 +26,7 @@ export function SettingsPanel() {
   )
   const hasCr = (exam?.maxima.cr ?? 0) > 0
   return (
-    <div className="stack">
+    <div className="stack settings">
       <section className="stack-sm">
         <h3>성취수준 분할점수 (%)</h3>
         <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
@@ -29,15 +40,11 @@ export function SettingsPanel() {
         <div className="radio-group">
           <label>
             <input type="radio" name="basis" checked={settings.levelBasis === 'subjectMax'} onChange={() => setSettings({ levelBasis: 'subjectMax' })} />
-            <span>
-              과목 만점 기준 <span className="muted small">(영역총점 ÷ 과목만점{exam ? ` ${exam.maxima.total}` : ''})</span>
-            </span>
+            <Opt label="과목 만점 기준" desc={`영역총점 ÷ 과목만점${exam ? ` ${exam.maxima.total}` : ''}`} />
           </label>
           <label>
             <input type="radio" name="basis" checked={settings.levelBasis === 'mcMax'} onChange={() => setSettings({ levelBasis: 'mcMax' })} disabled={!hasCr} />
-            <span>
-              선다형 만점 기준 <span className="muted small">(선택형점수 ÷ 선택형만점{exam ? ` ${exam.maxima.mc}` : ''}){!hasCr && ' — 서답형이 없어 두 기준이 같습니다'}</span>
-            </span>
+            <Opt label="선다형 만점 기준" desc={`선택형점수 ÷ 선택형만점${exam ? ` ${exam.maxima.mc}` : ''}${hasCr ? '' : '. 서답형이 없어 두 기준이 같습니다.'}`} />
           </label>
         </div>
       </section>
@@ -47,15 +54,11 @@ export function SettingsPanel() {
         <div className="radio-group">
           <label>
             <input type="radio" name="sd" checked={settings.sdMode === 'population'} onChange={() => setSettings({ sdMode: 'population' })} />
-            <span>
-              모집단 (÷N) <span className="muted small">— KICE 분석 프로그램과 같은 값</span>
-            </span>
+            <Opt label="모집단 (÷N)" desc="KICE 분석 프로그램과 같은 값" />
           </label>
           <label>
             <input type="radio" name="sd" checked={settings.sdMode === 'sample'} onChange={() => setSettings({ sdMode: 'sample' })} />
-            <span>
-              표본 (÷(N−1)) <span className="muted small">— 엑셀 STDEV.S</span>
-            </span>
+            <Opt label="표본 (÷(N−1))" desc="엑셀 STDEV.S와 같은 값" />
           </label>
         </div>
       </section>
@@ -65,15 +68,11 @@ export function SettingsPanel() {
         <div className="radio-group">
           <label>
             <input type="radio" name="src" checked={settings.scoreSource === 'neis'} onChange={() => setSettings({ scoreSource: 'neis' })} />
-            <span>
-              NEIS 영역총점 <span className="muted small">— 공식 성적과 동일</span>
-            </span>
+            <Opt label="NEIS 영역총점" desc="공식 성적과 같은 값" />
           </label>
           <label>
             <input type="radio" name="src" checked={settings.scoreSource === 'recomputed'} onChange={() => setSettings({ scoreSource: 'recomputed' })} />
-            <span>
-              응답으로 재계산 <span className="muted small">— 정답 문항 배점 합 + 서답형 + 기타</span>
-            </span>
+            <Opt label="응답으로 재계산" desc="정답 문항 배점 합 + 서답형 + 기타" />
           </label>
         </div>
       </section>
@@ -91,9 +90,7 @@ export function SettingsPanel() {
         <h3>결시·미응시</h3>
         <label className="checkbox">
           <input type="checkbox" checked={settings.excludeNoResponse} onChange={(e) => setSettings({ excludeNoResponse: e.target.checked })} />
-          <span>
-            선다형 응답이 하나도 없는 학생은 분석에서 뺍니다 <span className="muted small">— 결시생이 0점으로 섞여 평균·성취수준 비율·신뢰도가 왜곡되는 것을 막습니다. 뺀 학생은 개요 탭 안내에 이름이 나옵니다.</span>
-          </span>
+          <Opt label="선다형 응답이 하나도 없는 학생은 분석에서 뺍니다" desc="결시생이 0점으로 섞여 평균·성취수준 비율·신뢰도가 왜곡되는 것을 막습니다. 뺀 학생은 개요 탭 안내에 이름이 나옵니다." />
         </label>
       </section>
 
@@ -101,9 +98,7 @@ export function SettingsPanel() {
         <h3>학년 전체 비교</h3>
         <label className="checkbox">
           <input type="checkbox" checked={settings.uploadedIsWholeGrade} onChange={(e) => setSettings({ uploadedIsWholeGrade: e.target.checked })} />
-          <span>
-            올린 반이 학년 전체입니다 <span className="muted small">— 체크하면 문항분석표 없이도 "학년 전체" 열을 올린 반 합계로 표시합니다.</span>
-          </span>
+          <Opt label="올린 반이 학년 전체입니다" desc={'체크하면 문항분석표 없이도 "학년 전체" 열을 올린 반 합계로 표시합니다.'} />
         </label>
       </section>
 

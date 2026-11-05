@@ -113,7 +113,7 @@ export function buildExam(files: ParsedFile[]): BuildResult {
     const desc = [...groups.values()].map((g) => `${describeHeader(g[0]!.header) || '(제목 없음)'} ← ${g.map((x) => x.fileName).join(', ')}`)
     const sigs = new Set(answers.map(keySignature))
     if (sigs.size > 1) {
-      errors.push({ level: 'error', code: 'mixed-exams', message: '서로 다른 시험(교과·고사)의 정오표가 섞여 있습니다. 한 시험의 파일만 남기고 나머지는 ✕로 빼 주세요.', details: desc })
+      errors.push({ level: 'error', code: 'mixed-exams', message: '서로 다른 시험(교과·고사)의 정오표가 섞여 있습니다. 한 시험의 파일만 남기고 나머지는 목록에서 빼 주세요.', details: desc })
       return { exam: null, errors, warnings }
     }
     warnings.push({ level: 'info', code: 'header-variants', message: '정오표마다 제목 표기가 조금 다르지만 정답·배점이 모두 같아 같은 시험으로 합쳤습니다.', details: desc })
@@ -212,28 +212,28 @@ export function buildExam(files: ParsedFile[]): BuildResult {
   const examHeader: ExamHeader = { ...ref.header }
   delete examHeader.classNo
 
-  // 정답/배점표 보강
+  // 문항정보표(정답·배점 양식) 보강
   const answerKey = files.find((f) => f.answerKey)?.answerKey
   if (answerKey) {
     const conflicts = headerConflicts(examHeader, answerKey.header).filter((x) => x === '교과목')
-    if (conflicts.length) warnings.push({ level: 'warn', code: 'answerkey-subject', message: `정답/배점표(${answerKey.fileName})의 교과목(${answerKey.header.subject})이 정오표(${examHeader.subject})와 다릅니다. 다른 과목 파일이 아닌지 확인해 주세요.` })
+    if (conflicts.length) warnings.push({ level: 'warn', code: 'answerkey-subject', message: `문항정보표(${answerKey.fileName})의 교과목(${answerKey.header.subject})이 정오표(${examHeader.subject})와 다릅니다. 다른 과목 파일이 아닌지 확인해 주세요.` })
     const akMc = answerKey.items.filter((i) => i.kind === 'mc')
     const diffs: string[] = []
-    if (akMc.length !== mcItems.length) diffs.push(`문항 수 정오표 ${mcItems.length} vs 정답배점표 ${akMc.length}`)
+    if (akMc.length !== mcItems.length) diffs.push(`문항 수 정오표 ${mcItems.length} vs 문항정보표 ${akMc.length}`)
     for (const it of mcItems) {
       const ak = akMc.find((x) => x.no === it.no)
       if (!ak) continue
       if (ak.keyMode === 'any' && ak.key.length > 1) {
         it.key = ak.key
         it.keyMode = 'any'
-      } else if (it.key.length && ak.key.length && !sameKey(it.key, ak.key)) diffs.push(`${it.no}번 정답 정오표 ${it.key.join(',')} vs 정답배점표 ${ak.key.join(',')}`)
+      } else if (it.key.length && ak.key.length && !sameKey(it.key, ak.key)) diffs.push(`${it.no}번 정답 정오표 ${it.key.join(',')} vs 문항정보표 ${ak.key.join(',')}`)
       if (!it.key.length && ak.key.length) {
         it.key = ak.key
         it.keyMode = ak.keyMode
       }
-      if (Math.abs(ak.points - it.points) > 0.005) diffs.push(`${it.no}번 배점 정오표 ${it.points} vs 정답배점표 ${ak.points}`)
+      if (Math.abs(ak.points - it.points) > 0.005) diffs.push(`${it.no}번 배점 정오표 ${it.points} vs 문항정보표 ${ak.points}`)
     }
-    if (diffs.length) warnings.push({ level: 'warn', code: 'answerkey-mismatch', message: `정답/배점표(${answerKey.fileName})가 정오표와 다른 부분이 있습니다. 정오표 기준으로 분석합니다.`, details: diffs })
+    if (diffs.length) warnings.push({ level: 'warn', code: 'answerkey-mismatch', message: `문항정보표(${answerKey.fileName})가 정오표와 다른 부분이 있습니다. 정오표 기준으로 분석합니다.`, details: diffs })
     if (answerKey.maxima.bonus) maxima.bonus = answerKey.maxima.bonus
   }
 

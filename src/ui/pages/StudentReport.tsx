@@ -60,14 +60,14 @@ export function StudentReport({ exam, result, student, settings, compact }: { ex
             {fmtPoints(student.total)} <span className="muted" style={{ fontSize: '1rem', fontWeight: 400 }}>/ {exam.maxima.total}점</span>
           </div>
           <div className="small muted">
-            성취율 {fmt1(student.pct)}% · 성취수준 {student.level}
-            {cut != null ? ` (${cut}% 이상)` : ''} · 선다형 {fmtPoints(student.mcScore)}/{exam.maxima.mc}
-            {hasCr && ` · 서답형 ${fmtPoints(student.crScore)}/${exam.maxima.cr}`}
+            성취율 {fmt1(student.pct)}%, 성취수준 {student.level}
+            {cut != null ? ` (${cut}% 이상)` : ''}, 선다형 {fmtPoints(student.mcScore)}/{exam.maxima.mc}
+            {hasCr && `, 서답형 ${fmtPoints(student.crScore)}/${exam.maxima.cr}`}
           </div>
         </div>
         <div className="small muted" style={{ marginLeft: 'auto', textAlign: 'right' }}>
           <div>
-            {st.classNo}반 평균 {fmt1(cls?.total.mean)} · 전체 평균 {fmt1(result.overview.total.mean)}
+            {st.classNo}반 평균 {fmt1(cls?.total.mean)}, 전체 평균 {fmt1(result.overview.total.mean)}
           </div>
           <div>틀린 문항 {student.wrongItems.length}개 / {result.mcCount}문항</div>
         </div>
@@ -81,7 +81,7 @@ export function StudentReport({ exam, result, student, settings, compact }: { ex
           <h3>성취기준별 도달 현황</h3>
           <DataTable columns={stdCols} rows={student.standards} rowKey={(r) => r.code} compact />
           <p className="small muted" style={{ marginTop: 4, marginBottom: 0 }}>
-            도달: 성취율 {settings.standardPassPct}% 이상 · 부분: 50% 이상 · 미도달: 50% 미만
+            도달은 성취율 {settings.standardPassPct}% 이상, 부분은 50% 이상, 미도달은 50% 미만입니다.
           </p>
         </section>
       )}

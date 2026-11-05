@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
+import { Icon } from '../components/Icon'
 import { LEVELS } from '../../model/types'
 import { useAppStore } from '../store/useAppStore'
 import { useAnalysis } from '../store/useAnalysis'
 import { alphaBand } from '../../model/thresholds'
 import { fmt1, fmt3, fmtInt } from '../../model/format'
 import { describeHeader } from '../../parsers/header'
-import { BandBadge, EmptyState, KpiTile, LevelChip, LevelLegend } from '../components/basic'
+import { BandBadge, EmptyState, KpiTile, LevelChip } from '../components/basic'
 import { DataTable } from '../components/DataTable'
 import { LevelStackedBar, ScoreHistogram, StandardAchievementBar } from '../charts/charts'
 import { LevelStatsTable } from './tabs/OverviewTab'
@@ -36,20 +37,20 @@ export function PrintToolbar({ title, children }: { title: string; children?: Re
   }
   return (
     <div className="print-toolbar screen-only">
-      <div className="container row row-between">
-        <div className="row">
-          <strong>{title}</strong>
-          {children}
-        </div>
-        <div className="row">
-          <span className="small muted">인쇄 대화상자에서 "배경 그래픽"을 켜면 색이 유지됩니다</span>
-          <button type="button" className="btn" onClick={() => window.history.back()}>
-            ← 돌아가기
+      <div className="container">
+        <div className="print-toolbar-main">
+          <button type="button" className="btn btn-sm btn-ghost" onClick={() => window.history.back()}>
+            <Icon name="arrow-left" />
+            돌아가기
           </button>
+          <strong className="print-toolbar-title">{title}</strong>
+          <span className="print-toolbar-hint">인쇄 대화상자에서 "배경 그래픽"을 켜야 색이 그대로 나옵니다.</span>
           <button type="button" className="btn btn-primary" onClick={print}>
-            🖨 인쇄 / PDF 저장
+            <Icon name="printer" />
+            인쇄 / PDF 저장
           </button>
         </div>
+        {children && <div className="print-toolbar-options">{children}</div>}
       </div>
     </div>
   )
@@ -83,17 +84,21 @@ export function PrintReportPage() {
     )
   }
   const on = (id: string) => sections[id] !== false
-  const meta = `${describeHeader(exam.header)} · ${result.classNos.length}개 반 ${fmtInt(result.overview.n)}명${result.classNos.length < exam.classes.length ? ` (${result.classNos.map((c) => `${c}반`).join(', ')})` : ''}`
+  const meta = `${describeHeader(exam.header)}, ${result.classNos.length}개 반 ${fmtInt(result.overview.n)}명${result.classNos.length < exam.classes.length ? ` (${result.classNos.map((c) => `${c}반`).join(', ')})` : ''}`
   const o = result.overview
   const groups = [{ name: '전체', stats: o }, ...result.classNos.map((c) => ({ name: `${c}반`, stats: result.byClass[c]! }))]
   const W = 680
   return (
     <div className="print-view">
       <PrintToolbar title="분석 보고서">
-        <span className="row small">
+        <span className="label" id="print-sections-label">
+          넣을 부분
+        </span>
+        <span className="print-sections" role="group" aria-labelledby="print-sections-label">
           {SECTIONS.map((s) => (
             <label key={s.id} className="checkbox">
-              <input type="checkbox" checked={on(s.id)} onChange={(e) => setUi({ printSections: { ...sections, [s.id]: e.target.checked } })} /> {s.label}
+              <input type="checkbox" checked={on(s.id)} onChange={(e) => setUi({ printSections: { ...sections, [s.id]: e.target.checked } })} />
+              <span>{s.label}</span>
             </label>
           ))}
         </span>
@@ -103,16 +108,17 @@ export function PrintReportPage() {
         <section className="print-page">
           <PrintHeader title="1. 요약" meta={meta} />
           <h1>성취평가 결과 분석 보고서</h1>
-          <p className="muted">{meta} · 작성 {new Date().toLocaleDateString('ko-KR')}</p>
+          <p className="muted">
+            {meta}. {new Date().toLocaleDateString('ko-KR')} 작성
+          </p>
           <div className="grid grid-kpi">
             <KpiTile label="응답자" value={`${fmtInt(o.n)}명`} />
-            <KpiTile label="문항" value={`${result.mcCount}${result.crCount ? ` + 서답형 ${result.crCount}` : ''}`} />
-            <KpiTile label={`평균 (${exam.maxima.total}점)`} value={fmt1(o.total.mean)} sub={`SD ${fmt1(o.total.sd)}`} />
+            <KpiTile label="문항" value={`${result.mcCount}문항`} sub={result.crCount ? `+ 서답형 ${result.crCount}문항` : '선다형'} />
+            <KpiTile label={`평균 (${exam.maxima.total}점)`} value={fmt1(o.total.mean)} sub={`표준편차 ${fmt1(o.total.sd)}`} />
             <KpiTile label="신뢰도 α" value={fmt3(o.alphaMc)} sub={<BandBadge band={alphaBand(o.alphaMc)} />} />
           </div>
           <h3 style={{ marginTop: 14 }}>성취수준 분포</h3>
           <LevelStackedBar groups={groups} height={Math.max(140, 50 + groups.length * 30)} width={W} />
-          <LevelLegend />
           <h3 style={{ marginTop: 14 }}>점수 분포 (100점 환산)</h3>
           <ScoreHistogram bins={result.histogram} cutoffs={settings.cutoffs} height={220} width={W} />
           <h3 style={{ marginTop: 14 }}>성취수준별 평균·표준편차</h3>
@@ -134,7 +140,7 @@ export function PrintReportPage() {
         <section className="print-page">
           <PrintHeader title="3. 문항 분석" meta={meta} />
           <h2>선다형 문항 분석</h2>
-          <p className="small muted">정답률 50% 미만 노랑, 25% 미만 빨강. 변별도 = 문항 점수와 (총점−문항 점수)의 상관. 진한 칸이 정답 답지.</p>
+          <p className="small muted">정답률이 50% 미만이면 연한 주황, 25% 미만이면 진한 주황으로 칠했습니다. 변별도는 문항 점수와 (총점−문항 점수)의 상관입니다. 진한 칸이 정답 답지입니다.</p>
           <DataTable columns={itemColumns(exam, { compact: true })} rows={result.items} rowKey={(r) => String(r.no)} compact />
         </section>
       )}
@@ -205,14 +211,15 @@ export function PrintReportPage() {
               분할점수: A {settings.cutoffs.AB} / B {settings.cutoffs.BC} / C {settings.cutoffs.CD} / D {settings.cutoffs.DE} (% 이상)
             </li>
             <li>성취수준 산출 기준: {settings.levelBasis === 'subjectMax' ? `과목 만점(${exam.maxima.total})` : `선다형 만점(${exam.maxima.mc})`}</li>
-            <li>표준편차: {settings.sdMode === 'population' ? '모집단(÷N)' : '표본(÷(N−1))'} · 총점 출처: {settings.scoreSource === 'neis' ? 'NEIS 영역총점' : '응답 재계산'}</li>
+            <li>표준편차: {settings.sdMode === 'population' ? '모집단(÷N)' : '표본(÷(N−1))'}</li>
+            <li>총점 출처: {settings.scoreSource === 'neis' ? 'NEIS 영역총점' : '응답 재계산'}</li>
             <li>입력 파일: {exam.sources.join(', ')}</li>
           </ul>
           <h2>지표 해석 기준 (교육부·KICE)</h2>
           <ul className="small">
-            <li>정답률(난이도): 75% 이상 쉬움 · 25~75% 보통 · 25% 미만 어려움</li>
-            <li>변별도(문항-총점 상관): .10 미만 없음 · .10~.20 매우 낮음 · .20~.30 낮음 · .30~.40 있음 · .40 이상 높음</li>
-            <li>신뢰도 α: .50 미만 수용 불가 · .50~.60 낮음 · .60~.70 의심 · .70~.80 수용 가능 · .80~.90 높음 · .90 이상 매우 높음</li>
+            <li>정답률(난이도): 75% 이상 쉬움, 25~75% 보통, 25% 미만 어려움</li>
+            <li>변별도(문항-총점 상관): .10 미만 없음, .10~.20 매우 낮음, .20~.30 낮음, .30~.40 있음, .40 이상 높음</li>
+            <li>신뢰도 α: .50 미만 수용 불가, .50~.60 낮음, .60~.70 의심, .70~.80 수용 가능, .80~.90 높음, .90 이상 매우 높음</li>
             <li>답지반응률: 무표기·복수표기·무효 답은 "무응답·중복"으로 합산 (KICE 프로그램과 동일)</li>
           </ul>
           {result.warnings.length > 0 && (

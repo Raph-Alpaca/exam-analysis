@@ -1,8 +1,8 @@
 import { LEVELS, type AnalysisResult, type Exam, type ItemStats, type Level } from '../../../model/types'
 import { useAppStore } from '../../store/useAppStore'
 import { fmt1, fmtInt } from '../../../model/format'
-import { heatStyle, LEVEL_COLORS, LEVEL_TEXT } from '../../theme/levels'
-import { Badge, KpiTile, LevelChip, SectionTitle } from '../../components/basic'
+import { heatStyle, LEVEL_COLORS } from '../../theme/levels'
+import { Badge, HeatLegend, KpiTile, LevelChip, SectionTitle } from '../../components/basic'
 import { DataTable, type Column } from '../../components/DataTable'
 import { itemColumns } from './ItemAnalysisTab'
 import { ItemDetailDrawer } from './ItemDetailDrawer'
@@ -45,7 +45,7 @@ export function levelMatrixColumns(result: AnalysisResult): Column<MatrixRow>[] 
         sortable: true,
       }),
     ),
-    { id: 'rev', header: '비고', cell: (r) => (r.reversed ? <Badge tone="warn">수준 역전</Badge> : null), accessor: (r) => (r.reversed ? 1 : 0), sortable: true },
+    { id: 'rev', header: '비고', cell: (r) => (r.reversed ? <Badge tone="warn">수준 역전</Badge> : null), accessor: (r) => (r.reversed ? 1 : 0), align: 'center', sortable: true },
   ]
 }
 
@@ -82,23 +82,22 @@ export function LevelAnalysisTab({ exam, result }: { exam: Exam; result: Analysi
   const rows = levelMatrixRows(result)
   return (
     <div className="stack">
-      <div className="row" role="group" aria-label="성취수준 선택">
-        <span className="small muted">수준:</span>
-        <button type="button" className={`btn btn-sm${lv === 'all' ? ' btn-primary' : ''}`} onClick={() => setUi({ selectedLevel: 'all' })} aria-pressed={lv === 'all'}>
-          전체
-        </button>
-        {LEVELS.map((l) => (
-          <button
-            key={l}
-            type="button"
-            className="btn btn-sm"
-            style={lv === l ? { background: LEVEL_COLORS[l], color: LEVEL_TEXT[l], borderColor: LEVEL_COLORS[l] } : undefined}
-            onClick={() => setUi({ selectedLevel: l })}
-            aria-pressed={lv === l}
-          >
-            {l} <span className="small">({result.byLevel[l].n})</span>
+      <div className="filter-row">
+        <span className="label" id="level-filter-label">
+          성취수준
+        </span>
+        <div className="seg" role="group" aria-labelledby="level-filter-label">
+          <button type="button" onClick={() => setUi({ selectedLevel: 'all' })} aria-pressed={lv === 'all'}>
+            전체
           </button>
-        ))}
+          {LEVELS.map((l) => (
+            <button key={l} type="button" onClick={() => setUi({ selectedLevel: l })} aria-pressed={lv === l}>
+              <span className="sw" style={{ background: LEVEL_COLORS[l] }} aria-hidden="true" />
+              {l}
+              <span className="count">{result.byLevel[l].n}명</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-kpi">
@@ -117,8 +116,8 @@ export function LevelAnalysisTab({ exam, result }: { exam: Exam; result: Analysi
       )}
 
       <section className="card">
-        <SectionTitle title="문항 × 성취수준 정답률">
-          진할수록 정답률이 높습니다. 낮은 수준의 정답률이 높은 수준보다 15%p 이상 높은 문항은 "수준 역전"으로 표시합니다(두 집단 모두 5명 이상일 때, 문항·답지 검토 필요). 행을 누르면 답지반응 상세.
+        <SectionTitle title="문항 × 성취수준 정답률" right={<HeatLegend />}>
+          정답률이 50%보다 낮으면 주황, 높으면 파랑으로 칠합니다. 낮은 수준의 정답률이 높은 수준보다 15%p 이상 높은 문항은 "수준 역전"으로 표시합니다(두 집단 모두 5명 이상일 때, 문항·답지 검토 필요). 행을 누르면 답지반응 상세.
         </SectionTitle>
         <DataTable columns={levelMatrixColumns(result)} rows={rows} rowKey={(r) => String(r.no)} onRowClick={(r) => setUi({ selectedItemNo: r.no })} selectedKey={selectedItem == null ? null : String(selectedItem)} compact />
       </section>

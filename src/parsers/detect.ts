@@ -3,9 +3,9 @@ import type { CellGrid } from '../xlsx/readWorkbook'
 export type FileKind = 'answers' | 'itemInfo' | 'answerKey' | 'itemAnalysis' | 'unknown'
 
 export const FILE_KIND_LABEL: Record<FileKind, string> = {
-  answers: '학생답 정오표',
-  itemInfo: '문항정보표(성취기준 포함)',
-  answerKey: '정답·배점표(문항정보표 간략형)',
+  answers: '교과목별 학생답 정오표',
+  itemInfo: '문항정보표 (성취기준 포함)',
+  answerKey: '문항정보표 (정답·배점 양식)',
   itemAnalysis: '문항분석표',
   unknown: '인식 불가',
 }

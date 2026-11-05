@@ -1,7 +1,8 @@
 import type { CSSProperties, ReactNode } from 'react'
 import type { Level, Warning } from '../../model/types'
 import type { Band, Tone } from '../../model/thresholds'
-import { LEVEL_COLORS, LEVEL_TEXT } from '../theme/levels'
+import { HEAT_GRADIENT, LEVEL_COLORS, LEVEL_TEXT } from '../theme/levels'
+import { Icon, type IconName } from './Icon'
 
 export function Badge({ tone = 'neutral', children, title }: { tone?: Tone | 'accent'; children: ReactNode; title?: string }) {
   return (
@@ -44,12 +45,29 @@ export function InlineBar({ value, isKey, max = 100 }: { value: number | null | 
   )
 }
 
+const CALLOUT_ICON: Record<'accent' | 'warn' | 'danger' | 'good', IconName> = { accent: 'info', warn: 'alert', danger: 'alert', good: 'check' }
+
 export function Callout({ tone = 'accent', title, children }: { tone?: 'accent' | 'warn' | 'danger' | 'good'; title?: ReactNode; children?: ReactNode }) {
   return (
     <div className={`callout${tone === 'accent' ? '' : ` callout-${tone}`}`} role={tone === 'danger' ? 'alert' : undefined}>
-      {title && <strong>{title}</strong>}
-      {children}
+      <Icon name={CALLOUT_ICON[tone]} />
+      <div className="callout-body">
+        {title && <strong>{title} </strong>}
+        {children}
+      </div>
     </div>
+  )
+}
+
+/** 열지도 범례: 50%가 회색, 낮으면 주황, 높으면 파랑 */
+export function HeatLegend({ label = '정답률' }: { label?: string }) {
+  return (
+    <span className="heat-legend" aria-label={`${label} 색: 50%는 회색, 낮을수록 주황, 높을수록 파랑`}>
+      <span>{label} 낮음</span>
+      <span className="bar" style={{ background: HEAT_GRADIENT }} aria-hidden="true" />
+      <span>높음</span>
+      <span className="muted">(가운데 50%)</span>
+    </span>
   )
 }
 
@@ -61,7 +79,7 @@ export function WarningList({ warnings, max = 8 }: { warnings: Warning[]; max?: 
   const render = (list: Warning[], tone: 'danger' | 'warn' | 'accent') =>
     list.length > 0 && (
       <Callout tone={tone}>
-        <ul>
+        <ul className={list.length === 1 ? 'plain' : undefined}>
           {list.slice(0, max).map((w, i) => (
             <li key={`${w.code}-${i}`}>
               {w.message}

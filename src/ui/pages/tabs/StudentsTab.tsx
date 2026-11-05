@@ -7,6 +7,7 @@ import { DataTable, type Column } from '../../components/DataTable'
 import { Drawer } from '../../components/Drawer'
 import { StudentReport } from '../StudentReport'
 import { navigate } from '../../app/router'
+import { Icon } from '../../components/Icon'
 
 export function StudentsTab({ exam, result }: { exam: Exam; result: AnalysisResult }) {
   const [q, setQ] = useState('')
@@ -39,10 +40,14 @@ export function StudentsTab({ exam, result }: { exam: Exam; result: AnalysisResu
           title="학생별 결과"
           right={
             <div className="row">
-              <input type="search" placeholder="이름·번호·학번 검색" value={q} onChange={(e) => setQ(e.target.value)} aria-label="학생 검색" style={{ padding: '6px 10px', border: '1px solid var(--border-strong)', borderRadius: 6 }} />
+              <label className="search">
+                <Icon name="search" />
+                <input type="search" placeholder="이름·번호·학번으로 찾기" value={q} onChange={(e) => setQ(e.target.value)} aria-label="학생 찾기" />
+              </label>
               {exam.classes.map((c) => (
                 <button key={c.classNo} type="button" className="btn btn-sm" onClick={() => navigate(`/print/class/${c.classNo}`)}>
-                  🖨 {c.classNo}반 리포트 인쇄
+                  <Icon name="printer" />
+                  {c.classNo}반 리포트 인쇄
                 </button>
               ))}
             </div>
@@ -57,10 +62,12 @@ export function StudentsTab({ exam, result }: { exam: Exam; result: AnalysisResu
           <div className="stack">
             <div className="row">
               <button type="button" className="btn btn-sm" onClick={() => navigate(`/print/student/${encodeURIComponent(selected.student.id)}`)}>
-                🖨 이 학생 인쇄
+                <Icon name="printer" />
+                이 학생 인쇄
               </button>
               <button type="button" className="btn btn-sm" onClick={() => navigate(`/print/class/${selected.student.classNo}`)}>
-                🖨 {selected.student.classNo}반 전체 인쇄
+                <Icon name="printer" />
+                {selected.student.classNo}반 전체 인쇄
               </button>
             </div>
             <StudentReport exam={exam} result={result} student={selected} settings={settings} />

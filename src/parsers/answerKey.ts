@@ -103,7 +103,7 @@ export function parseAnswerKey(grid: CellGrid, fileName: string): AnswerKeyParse
     }
     r = rr
   }
-  if (items.length === 0) throw new ParseError('no-items', `${fileName}: 정답/배점표에서 문항을 찾지 못했습니다.`)
+  if (items.length === 0) throw new ParseError('no-items', `${fileName}: 문항정보표(정답·배점 양식)에서 문항을 찾지 못했습니다.`)
   items.sort((a, b) => (a.kind === b.kind ? a.no - b.no : a.kind === 'mc' ? -1 : 1))
   return { fileName, header, items, maxima, warnings }
 }

@@ -43,13 +43,13 @@ interface AppState {
 
 let seq = 0
 
+/** 파일 목록에 보일 설명: "종류 · 세부 · 세부" (첫 칸은 짧은 종류 이름) */
 function describe(p: ParsedFile): string {
-  const base = FILE_KIND_LABEL[p.kind]
-  if (p.answers) return `${base} · ${p.answers.classNos.map((c) => `${c}반`).join(', ')} · ${p.answers.students.length}명 · ${p.answers.mcItems.length}문항`
-  if (p.itemInfo) return `${base} · ${p.itemInfo.items.length}문항 · 성취기준 ${p.itemInfo.standards.length}개`
-  if (p.answerKey) return `${base} · ${p.answerKey.items.length}문항`
-  if (p.itemAnalysis) return `${base} · ${p.itemAnalysis.items.length}문항 · 학년 ${p.itemAnalysis.gradeN ?? '?'}명`
-  return base
+  if (p.answers) return `학생답 정오표 · ${p.answers.classNos.map((c) => `${c}반`).join(', ')} · ${p.answers.students.length}명 · ${p.answers.mcItems.length}문항`
+  if (p.itemInfo) return `문항정보표 · 성취기준 포함 · ${p.itemInfo.items.length}문항 · 성취기준 ${p.itemInfo.standards.length}개`
+  if (p.answerKey) return `문항정보표 · 정답·배점 양식 · ${p.answerKey.items.length}문항`
+  if (p.itemAnalysis) return `문항분석표 · ${p.itemAnalysis.classNo ? `${p.itemAnalysis.classNo}반 · ` : ''}${p.itemAnalysis.items.length}문항 · 학년 ${p.itemAnalysis.gradeN ?? '?'}명`
+  return FILE_KIND_LABEL[p.kind]
 }
 
 function rebuild(files: FileEntry[]): Pick<AppState, 'exam' | 'buildErrors' | 'buildWarnings'> {

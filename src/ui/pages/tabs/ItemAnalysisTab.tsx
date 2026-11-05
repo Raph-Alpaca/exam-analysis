@@ -56,7 +56,7 @@ export function itemColumns(exam: Exam, opts: { compact?: boolean } = {}): Colum
       opts.compact ? (
         <span className="small">{r.flags.filter((f) => f.severity !== 'info').map((f) => f.label).join(', ')}</span>
       ) : (
-        <span className="row" style={{ gap: 4 }}>
+        <span className="flag-list">
           {r.flags.map((f) => (
             <Badge key={f.code} tone={f.severity === 'danger' ? 'danger' : f.severity === 'warn' ? 'warn' : 'neutral'}>
               {f.label}
@@ -65,7 +65,9 @@ export function itemColumns(exam: Exam, opts: { compact?: boolean } = {}): Colum
         </span>
       ),
     accessor: (r) => r.flags.length,
+    align: 'left',
     sortable: true,
+    width: opts.compact ? undefined : 136,
   })
   return cols
 }
@@ -76,13 +78,13 @@ export function ThresholdHelp() {
       <summary>지표 해석 기준 (교육부·KICE)</summary>
       <div className="small muted stack-sm" style={{ marginTop: 6 }}>
         <div>
-          <strong>정답률(난이도)</strong>: 75% 이상 쉬움 · 25~75% 보통 · 25% 미만 어려움 (3단계, Cangelosi 1990). 문항정보표의 예상난이도와 다르면 플래그.
+          <strong>정답률(난이도)</strong>: 75% 이상 쉬움, 25~75% 보통, 25% 미만 어려움 (3단계, Cangelosi 1990). 문항정보표의 예상난이도와 다르면 "확인 필요"에 표시합니다.
         </div>
         <div>
-          <strong>변별도</strong>: 문항 점수와 (총점 − 문항 점수)의 상관. .10 미만 없음 · .10~.20 매우 낮음 · .20~.30 낮음 · .30~.40 있음 · .40 이상 높음. 정답률이 아주 높거나 낮은 문항은 낮게 나올 수 있습니다.
+          <strong>변별도</strong>: 문항 점수와 (총점 − 문항 점수)의 상관. .10 미만 없음, .10~.20 매우 낮음, .20~.30 낮음, .30~.40 있음, .40 이상 높음. 정답률이 아주 높거나 낮은 문항은 낮게 나올 수 있습니다.
         </div>
         <div>
-          <strong>신뢰도 α</strong>(Knapp 1991): .50 미만 수용 불가 · .50~.60 낮음 · .60~.70 의심 · .70~.80 수용 가능 · .80~.90 높음 · .90 이상 매우 높음.
+          <strong>신뢰도 α</strong>(Knapp 1991): .50 미만 수용 불가, .50~.60 낮음, .60~.70 의심, .70~.80 수용 가능, .80~.90 높음, .90 이상 매우 높음.
         </div>
         <div>
           <strong>답지반응률</strong>: 무표기·복수표기·무효 답은 "무응답·중복"으로 모읍니다(KICE 프로그램과 동일). 오답을 30% 이상이 고르면 "매력적 오답"으로 표시합니다.
@@ -114,7 +116,7 @@ export function ItemAnalysisTab({ exam, result }: { exam: Exam; result: Analysis
       </section>
       <section className="card">
         <SectionTitle title="선다형 문항 분석" right={<span className="muted small">행을 누르면 성취수준별·학급별 상세</span>}>
-          정답 답지는 진한 칸. 정답률 50% 미만은 노랑, 25% 미만은 빨강으로 표시합니다.
+          정답 답지는 진한 파랑 막대입니다. 정답률이 50% 미만이면 연한 주황, 25% 미만이면 진한 주황으로 칠합니다.
         </SectionTitle>
         <DataTable columns={itemColumns(exam)} rows={result.items} rowKey={(r) => String(r.no)} onRowClick={(r) => setUi({ selectedItemNo: r.no })} selectedKey={selected == null ? null : String(selected)} compact />
         <ThresholdHelp />

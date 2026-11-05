@@ -5,6 +5,7 @@ import { navigate } from '../app/router'
 import { Tabs } from '../components/Tabs'
 import { Drawer } from '../components/Drawer'
 import { EmptyState, WarningList } from '../components/basic'
+import { Icon, OmrMark } from '../components/Icon'
 import { SettingsPanel } from './SettingsPanel'
 import { describeHeader } from '../../parsers/header'
 import { exportExcel } from '../../export/excel'
@@ -31,20 +32,24 @@ export function ClassFilterBar() {
     setUi({ classFilter: next.length === exam.classes.length ? [] : next })
   }
   return (
-    <div className="row class-filter" role="group" aria-label="학급 필터">
-      <span className="small muted">학급:</span>
-      <button type="button" className={`btn btn-sm${all ? ' btn-primary' : ''}`} onClick={() => setUi({ classFilter: [] })} aria-pressed={all}>
-        전체
-      </button>
-      {exam.classes.map((c) => {
-        const on = !all && classFilter.includes(c.classNo)
-        return (
-          <button key={c.classNo} type="button" className={`btn btn-sm${on ? ' btn-primary' : ''}`} onClick={() => toggle(c.classNo)} aria-pressed={on}>
-            {c.classNo}반
-          </button>
-        )
-      })}
-      {!all && <span className="small muted">선택한 반만 집계합니다</span>}
+    <div className="filter-row class-filter">
+      <span className="label" id="class-filter-label">
+        학급
+      </span>
+      <div className="seg" role="group" aria-labelledby="class-filter-label">
+        <button type="button" onClick={() => setUi({ classFilter: [] })} aria-pressed={all}>
+          전체
+        </button>
+        {exam.classes.map((c) => {
+          const on = !all && classFilter.includes(c.classNo)
+          return (
+            <button key={c.classNo} type="button" onClick={() => toggle(c.classNo)} aria-pressed={on}>
+              {c.classNo}반
+            </button>
+          )
+        })}
+      </div>
+      {!all && <span className="small muted">고른 반만 집계합니다</span>}
     </div>
   )
 }
@@ -64,14 +69,25 @@ export function ResultsPage({ tab }: { tab: ResultTab }) {
 
   if (!exam || !result) {
     return (
-      <main className="container page">
-        <EmptyState>
-          <p>분석할 자료가 없습니다. 새로고침하면 자료가 지워집니다(개인정보 보호를 위해 저장하지 않습니다).</p>
-          <a className="btn btn-primary" href="#/">
-            파일 올리기
-          </a>
-        </EmptyState>
-      </main>
+      <>
+        <header className="topbar">
+          <div className="container topbar-inner">
+            <a className="brand" href="#/">
+              <OmrMark />
+              <span className="label">성취평가 결과 분석</span>
+            </a>
+          </div>
+        </header>
+        <main className="container page">
+          <EmptyState>
+            <p>분석할 자료가 없습니다. 개인정보 보호를 위해 자료를 저장하지 않으므로, 새로고침하면 파일을 다시 올려야 합니다.</p>
+            <a className="btn btn-primary" href="#/">
+              <Icon name="upload" />
+              파일 올리기
+            </a>
+          </EmptyState>
+        </main>
+      </>
     )
   }
 
@@ -100,31 +116,64 @@ export function ResultsPage({ tab }: { tab: ResultTab }) {
   return (
     <>
       <header className="topbar">
-        <div className="container">
+        <div className="container topbar-inner">
           <a className="brand" href="#/">
-            성취평가 결과 분석
+            <OmrMark />
+            <span className="label">성취평가 결과 분석</span>
           </a>
-          <span className="meta">
-            {describeHeader(exam.header)} · {exam.classes.length}개 반 · {studentCount}명 · {result.mcCount}문항{result.crCount ? ` + 서답형 ${result.crCount}` : ''}
-          </span>
           <div className="actions">
-            <a className="btn btn-sm" href="#/">
-              파일 추가·변경
+            <a className="btn btn-sm btn-ghost" href="#/" title="파일 바꾸기">
+              <Icon name="upload" />
+              <span className="label">파일 바꾸기</span>
             </a>
-            <button type="button" className="btn btn-sm" onClick={() => setUi({ settingsOpen: true })}>
-              ⚙ 설정
+            <button type="button" className="btn btn-sm btn-ghost" onClick={() => setUi({ settingsOpen: true })} title="설정">
+              <Icon name="sliders" />
+              <span className="label">설정</span>
             </button>
-            <button type="button" className="btn btn-sm" onClick={doExport} disabled={exporting}>
-              {exporting ? '만드는 중…' : '⬇ 엑셀 내보내기'}
+            <button type="button" className="btn btn-sm" onClick={doExport} disabled={exporting} title="엑셀로 내보내기">
+              <Icon name={exporting ? 'spinner' : 'download'} />
+              <span className="label">{exporting ? '만드는 중' : '엑셀로 내보내기'}</span>
             </button>
-            <button type="button" className="btn btn-sm" onClick={() => navigate('/print/report')}>
-              🖨 보고서 인쇄
+            <button type="button" className="btn btn-sm btn-primary" onClick={() => navigate('/print/report')} title="보고서 인쇄">
+              <Icon name="printer" />
+              <span className="label">보고서 인쇄</span>
             </button>
           </div>
         </div>
       </header>
+      <div className="container page-head">
+        <h1>{describeHeader(exam.header)}</h1>
+        <dl className="facts">
+          <div>
+            <dt>학생</dt>
+            <dd>{studentCount}명</dd>
+          </div>
+          <div>
+            <dt>학급</dt>
+            <dd>{exam.classes.length}개 반</dd>
+          </div>
+          <div>
+            <dt>선다형</dt>
+            <dd>{result.mcCount}문항</dd>
+          </div>
+          {result.crCount > 0 && (
+            <div>
+              <dt>서답형</dt>
+              <dd>{result.crCount}문항</dd>
+            </div>
+          )}
+          <div>
+            <dt>만점</dt>
+            <dd>{exam.maxima.total}점</dd>
+          </div>
+        </dl>
+      </div>
+      <div className="tabbar">
+        <div className="container">
+          <Tabs tabs={tabs} active={activeTab} onChange={(id) => navigate(`/results/${id}`)} ariaLabel="분석 탭" />
+        </div>
+      </div>
       <main className="container page">
-        <Tabs tabs={tabs} active={activeTab} onChange={(id) => navigate(`/results/${id}`)} ariaLabel="분석 탭" />
         <div className="stack">
           <ClassFilterBar />
           {activeTab === 'overview' && <WarningList warnings={[...buildWarnings, ...result.warnings]} />}

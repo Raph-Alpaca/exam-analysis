@@ -3,8 +3,8 @@ import { CHOICES, LEVELS, type AnalysisResult, type Exam, type GroupStats } from
 import { useAppStore } from '../../store/useAppStore'
 import { useFullAnalysis } from '../../store/useAnalysis'
 import { fmt1, fmtInt } from '../../../model/format'
-import { heatStyle, LEVEL_COLORS } from '../../theme/levels'
-import { LevelLegend, SectionTitle } from '../../components/basic'
+import { heatStyle } from '../../theme/levels'
+import { HeatLegend, LevelChip, SectionTitle } from '../../components/basic'
 import { DataTable, type Column } from '../../components/DataTable'
 import { LevelStackedBar } from '../../charts/charts'
 import { buildNeisTable, usesGradeReference, type NeisTableRow } from '../../../stats/neisTable'
@@ -22,15 +22,14 @@ export function ClassStatsTable({ result, caption }: { result: AnalysisResult; c
     ...LEVELS.map(
       (l): Column<ClassRow> => ({
         id: `l${l}`,
-        header: l,
-        group: '성취수준별 비율(%) · 학생 수',
+        header: <LevelChip level={l} />,
+        group: '성취수준별 비율(%)과 학생 수',
         accessor: (r) => r.g.levelPct[l],
         cell: (r) => (
-          <span>
-            {fmt1(r.g.levelPct[l])} <span className="muted small">({r.g.levelCounts[l]})</span>
+          <span className="nowrap">
+            {fmt1(r.g.levelPct[l])} <span className="muted small">({r.g.levelCounts[l]}명)</span>
           </span>
         ),
-        cellStyle: () => ({ borderLeft: `4px solid ${LEVEL_COLORS[l]}` }),
         sortable: true,
       }),
     ),
@@ -69,7 +68,7 @@ export function ItemByClassTable({ exam, result, caption }: { exam: Exam; result
     { id: 'all', header: result.classNos.length > 1 ? '선택 반 전체' : '전체', accessor: (r) => r.all, cell: (r) => fmt1(r.all), cellStyle: (r) => heatStyle(r.all), sortable: true },
     { id: 'grade', header: grade.label, accessor: (r) => r.grade, cell: (r) => fmt1(r.grade), cellStyle: (r) => heatStyle(r.grade), sortable: true },
   ]
-  return <DataTable columns={cols} rows={rows} rowKey={(r) => String(r.no)} caption={caption ?? '문항별 정답률(%) — 진할수록 높음'} compact />
+  return <DataTable columns={cols} rows={rows} rowKey={(r) => String(r.no)} caption={caption ?? '문항별 정답률(%)'} compact />
 }
 
 export function NeisItemTable({ exam, classNo }: { exam: Exam; classNo: string }) {
@@ -87,8 +86,8 @@ export function NeisItemTable({ exam, classNo }: { exam: Exam; classNo: string }
     { id: 'multi', header: '중복표기', cell: (r) => r.multi, align: 'center' },
   ]
   const ref = exam.gradeReference
-  const note = table.usesReference && ref?.verified && ref.classNo ? ` · 올린 문항분석표(${ref.classNo}반)와 대조 완료` : ''
-  return <DataTable columns={cols} rows={table.rows} rowKey={(r) => String(r.no)} caption={`${classNo}반 문항분석표 (NEIS 양식 재구성, ${table.n}명) · 괄호 안: ${table.gradeLabel}${note}`} compact />
+  const note = table.usesReference && ref?.verified && ref.classNo ? ` 올린 문항분석표(${ref.classNo}반)와 대조를 마쳤습니다.` : ''
+  return <DataTable columns={cols} rows={table.rows} rowKey={(r) => String(r.no)} caption={`${classNo}반 문항분석표 (NEIS 양식 재구성, ${table.n}명). 괄호 안은 ${table.gradeLabel}.${note}`} compact />
 }
 
 export function ClassCompareTab({ exam, result }: { exam: Exam; result: AnalysisResult }) {
@@ -96,19 +95,16 @@ export function ClassCompareTab({ exam, result }: { exam: Exam; result: Analysis
   const groups = result.classNos.map((c) => ({ name: `${c}반`, stats: result.byClass[c]! }))
   return (
     <div className="stack">
-      <div className="grid grid-2">
-        <section className="card">
-          <SectionTitle title="학급별 성취도" />
-          <ClassStatsTable result={result} />
-        </section>
-        <section className="card">
-          <SectionTitle title="학급별 성취수준 비율" />
-          <LevelStackedBar groups={groups} height={Math.max(160, 60 + groups.length * 34)} />
-          <LevelLegend />
-        </section>
-      </div>
       <section className="card">
-        <SectionTitle title="문항 × 학급 정답률">반마다 유독 낮은 문항을 찾습니다. 마지막 열은 학년 전체 기준(문항분석표가 있으면 그 값, 없으면 올린 반 합계).</SectionTitle>
+        <SectionTitle title="학급별 성취도" />
+        <ClassStatsTable result={result} />
+      </section>
+      <section className="card">
+        <SectionTitle title="학급별 성취수준 비율">한 줄이 그 반 학생 전체(100%)입니다.</SectionTitle>
+        <LevelStackedBar groups={groups} height={Math.max(160, 60 + groups.length * 34)} />
+      </section>
+      <section className="card">
+        <SectionTitle title="문항 × 학급 정답률" right={<HeatLegend />}>반마다 유독 낮은 문항을 찾습니다. 마지막 열은 학년 전체 기준(문항분석표가 있으면 그 값, 없으면 올린 반 합계).</SectionTitle>
         <ItemByClassTable exam={exam} result={result} />
       </section>
       <section className="card">

@@ -2,7 +2,7 @@ import { LEVELS, type AnalysisResult, type Exam, type GroupStats, type Level } f
 import { useAppStore } from '../../store/useAppStore'
 import { alphaBand } from '../../../model/thresholds'
 import { fmt1, fmt3, fmtInt } from '../../../model/format'
-import { BandBadge, KpiTile, LevelChip, LevelLegend, SectionTitle } from '../../components/basic'
+import { BandBadge, KpiTile, LevelChip, SectionTitle } from '../../components/basic'
 import { DataTable, type Column } from '../../components/DataTable'
 import { LevelStackedBar, ScoreHistogram } from '../../charts/charts'
 
@@ -48,11 +48,11 @@ export function OverviewTab({ exam, result }: { exam: Exam; result: AnalysisResu
       <div className="grid grid-2">
         <section className="card">
           <SectionTitle title="성취수준 분포">분할점수 A {settings.cutoffs.AB} / B {settings.cutoffs.BC} / C {settings.cutoffs.CD} / D {settings.cutoffs.DE} 이상</SectionTitle>
-          <LevelStackedBar groups={groups} height={Math.max(160, 60 + groups.length * 34)} />
-          <LevelLegend />
+          {/* 옆 점수 분포(280px)와 높이를 맞춘다 */}
+          <LevelStackedBar groups={groups} height={Math.max(280, 60 + groups.length * 34)} />
         </section>
         <section className="card">
-          <SectionTitle title="점수 분포">100점 환산, 5점 구간, 막대 색 = 성취수준</SectionTitle>
+          <SectionTitle title="점수 분포">100점 환산 점수의 5점 구간별 학생 수, 막대 색은 성취수준</SectionTitle>
           <ScoreHistogram bins={result.histogram} cutoffs={settings.cutoffs} />
         </section>
       </div>
