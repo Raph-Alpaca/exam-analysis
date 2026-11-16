@@ -4,6 +4,7 @@ import { navigate } from '../app/router'
 import { Callout, WarningList } from '../components/basic'
 import { Icon, OmrMark } from '../components/Icon'
 import { describeHeader } from '../../parsers/header'
+import { fmtPoints } from '../../model/format'
 import { loadDemoFiles } from '../store/demo'
 import type { FileKind } from '../../parsers/detect'
 
@@ -126,7 +127,7 @@ export function UploadPage() {
             성취평가 결과 분석
           </a>
           <div className="actions">
-            <a className="btn btn-sm btn-ghost" href="https://github.com/Raph-Alpaca/exam-analysis#readme" target="_blank" rel="noreferrer">
+            <a className="btn btn-sm btn-ghost" href="#/guide">
               <Icon name="info" />
               <span className="label">사용 안내</span>
             </a>
@@ -233,7 +234,7 @@ export function UploadPage() {
                   <strong>{describeHeader(exam.header)}</strong>
                   <div>
                     {exam.classes.length}개 반, 학생 {studentCount}명, 선다형 {exam.items.filter((i) => i.kind === 'mc').length}문항
-                    {exam.items.some((i) => i.kind === 'cr') && `, 서답형 ${exam.items.filter((i) => i.kind === 'cr').length}문항`}을 분석할 수 있습니다.
+                    {exam.items.some((i) => i.kind === 'cr') ? `, 서답형 ${exam.items.filter((i) => i.kind === 'cr').length}문항` : exam.maxima.cr > 0 ? `, 서답형(총점 ${fmtPoints(exam.maxima.cr)}점)` : ''}을 분석할 수 있습니다.
                     {!exam.hasItemInfo && ' 성취기준이 들어 있는 문항정보표가 없어 성취기준·내용영역 분석은 빠집니다.'}
                   </div>
                 </Callout>
@@ -289,9 +290,7 @@ export function UploadPage() {
       <footer className="site-foot">
         <div className="container container-upload">
           <span>올린 파일은 이 브라우저 밖으로 나가지 않습니다.</span>
-          <a href="https://github.com/Raph-Alpaca/exam-analysis" target="_blank" rel="noreferrer">
-            소스 코드
-          </a>
+          <a href="#/guide">사용 안내</a>
         </div>
       </footer>
     </>

@@ -1,6 +1,6 @@
 import type { CellGrid } from '../xlsx/readWorkbook'
 import type { ChoiceKey, ExamHeader, GradeItemRef, Warning } from '../model/types'
-import { parseExamHeader } from './header'
+import { parseExamHeader, parseExamSubjectRow } from './header'
 import { ParseError } from './errors'
 
 export interface ItemAnalysisParse {
@@ -76,11 +76,10 @@ export function parseItemAnalysis(grid: CellGrid, fileName: string): ItemAnalysi
   }
   delete header.classNo
   for (let r = 1; r <= Math.min(grid.rows, 12); r++) {
-    const line = grid.rowTexts(r).join(' ')
-    const m = /고사\s*:\s*(.+?)\s+교과목\s*:\s*(\S+)/.exec(line)
+    const m = parseExamSubjectRow(grid.rowTexts(r))
     if (m) {
-      header.examName = m[1]!.trim()
-      header.subject = m[2]!.trim()
+      header.examName = m.examName
+      header.subject = m.subject
       break
     }
   }

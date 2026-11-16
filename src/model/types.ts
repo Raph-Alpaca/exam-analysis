@@ -243,6 +243,8 @@ export interface AnalysisResult {
   mcCount: number
   crCount: number
   classNos: string[]
+  /** 설정된 단계에서 쓰는 성취수준 (5단계 A~E / 3단계 A~C). 화면·보고서는 이 목록만 보여 준다. */
+  activeLevels: Level[]
   overview: GroupStats & { alphaMc: number | null; alphaAll: number | null }
   byClass: Record<string, GroupStats>
   byLevel: Record<Level, GroupStats>

@@ -1,8 +1,9 @@
 import type { CellGrid } from '../xlsx/readWorkbook'
 import type { ExamHeader, Item, Warning } from '../model/types'
 import { decodeKey } from './legend'
-import { parseExamHeader } from './header'
+import { parseExamHeader, parseExamSubjectRow } from './header'
 import { ParseError } from './errors'
+import { RE_CR_SECTION, RE_MC_SECTION } from './terms'
 
 export interface AnswerKeyParse {
   fileName: string
@@ -19,10 +20,10 @@ export function parseAnswerKey(grid: CellGrid, fileName: string): AnswerKeyParse
   for (let r = 1; r <= Math.min(grid.rows, 8); r++) {
     const line = grid.rowTexts(r).filter((x) => x !== '').join('   ')
     if (/학년도/.test(line) && !header.raw) header = parseExamHeader(line)
-    const m = /고사\s*:\s*(.+?)\s+교과목\s*:\s*(\S+)/.exec(line)
+    const m = parseExamSubjectRow(grid.rowTexts(r))
     if (m) {
-      header.examName = m[1]!.trim()
-      header.subject = m[2]!.trim()
+      header.examName = m.examName
+      header.subject = m.subject
     }
   }
   delete header.classNo
@@ -51,8 +52,8 @@ export function parseAnswerKey(grid: CellGrid, fileName: string): AnswerKeyParse
   while (r <= grid.rows) {
     const texts = grid.rowTexts(r)
     const first = texts.find((x) => x !== '') ?? ''
-    if (/^서답형$/.test(first)) kind = 'cr'
-    if (/^선택형$/.test(first)) kind = 'mc'
+    if (RE_CR_SECTION.test(first)) kind = 'cr'
+    if (RE_MC_SECTION.test(first)) kind = 'mc'
     const starts = texts.map((x, i) => (x.replace(/\s+/g, '') === '문항' ? i + 1 : 0)).filter(Boolean)
     if (starts.length < 2) {
       r++

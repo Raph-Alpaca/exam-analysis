@@ -113,7 +113,14 @@ export const useAppStore = create<AppState>()(
       },
 
       setSettings(patch) {
-        set((s) => ({ settings: { ...s.settings, ...patch, cutoffs: { ...s.settings.cutoffs, ...(patch.cutoffs ?? {}) } } }))
+        set((s) => ({
+          settings: {
+            ...s.settings,
+            ...patch,
+            cutoffs: { ...s.settings.cutoffs, ...(patch.cutoffs ?? {}) },
+            cutoffs3: { ...s.settings.cutoffs3, ...(patch.cutoffs3 ?? {}) },
+          },
+        }))
       },
       resetSettings() {
         set({ settings: DEFAULT_SETTINGS })
@@ -128,7 +135,15 @@ export const useAppStore = create<AppState>()(
       partialize: (s) => ({ settings: s.settings }),
       merge: (persisted, current) => {
         const p = (persisted as Partial<AppState> | undefined) ?? {}
-        return { ...current, settings: { ...current.settings, ...(p.settings ?? {}), cutoffs: { ...current.settings.cutoffs, ...(p.settings?.cutoffs ?? {}) } } }
+        return {
+          ...current,
+          settings: {
+            ...current.settings,
+            ...(p.settings ?? {}),
+            cutoffs: { ...current.settings.cutoffs, ...(p.settings?.cutoffs ?? {}) },
+            cutoffs3: { ...current.settings.cutoffs3, ...(p.settings?.cutoffs3 ?? {}) },
+          },
+        }
       },
     },
   ),

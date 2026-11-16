@@ -44,6 +44,8 @@ export interface AnswerSheetSpec {
   circledKeys?: boolean
   /** 선택지 수 (기본 5) */
   nChoices?: 4 | 5
+  /** 서답형 점수 열의 머리글 (기본 "서답형점수") */
+  crScoreHeader?: string
 }
 
 export interface GeneratedStudent {
@@ -144,7 +146,7 @@ export function makeAnswerSheet(spec: AnswerSheetSpec): AnswerSheetFixture {
   else aoa.push([])
   aoa.push([...Array(8).fill(null), '정기시험교과목별 학생답 정오표'])
   aoa.push([headerLine])
-  const itemHdr: (string | number | null)[] = [spec.idFirst ? '학번' : '반/번호', spec.idFirst ? '반/번호' : null, '번호', ...keys.map((_, i) => i + 1), ...crCols.map((c) => c.label), '선택형점수', '서답형점수', '기타점수', '영역총점']
+  const itemHdr: (string | number | null)[] = [spec.idFirst ? '학번' : '반/번호', spec.idFirst ? '반/번호' : null, '번호', ...keys.map((_, i) => i + 1), ...crCols.map((c) => c.label), '선택형점수', spec.crScoreHeader ?? '서답형점수', '기타점수', '영역총점']
   aoa.push(itemHdr)
   aoa.push([null, null, '정답', ...keyCells.map((k) => (/^\d+$/.test(k) ? Number(k) : k)), ...crCols.map(() => null)])
   aoa.push([null, null, '배점', ...points, ...crCols.map((c) => c.points), mcMax, crMax, 0, mcMax + crMax])
@@ -190,6 +192,10 @@ export interface ItemInfoSpec {
   crAfterTotal?: boolean
   /** 제목 (예전 이름 "이원목적분류표") */
   title?: string
+  /** 서답형 구역 제목 (기본 "서답형 문항"). 빈 문자열이면 제목 행을 넣지 않는다 */
+  crSectionTitle?: string
+  /** 서답형 문항번호 칸: 1, 2 …(기본) / "서답1" 같은 이름 */
+  crNoStyle?: 'int' | 'label'
 }
 
 export function makeItemInfo(spec: ItemInfoSpec): Aoa {
@@ -222,11 +228,16 @@ export function makeItemInfo(spec: ItemInfoSpec): Aoa {
   }
   const crSection = () => {
     if (!spec.crItems?.length) return
-    aoa.push(['서답형 문항'])
+    const title = spec.crSectionTitle ?? '서답형 문항'
+    if (title) aoa.push([title])
     header()
     spec.crItems.forEach((c, i) => {
       const text = c.standards.map((s) => `${s} ${spec.standardText[s] ?? ''}`).join('')
-      aoa.push(itemRow(i + 1, c.domain, text, '보통', c.points, null))
+      const row = itemRow(i + 1, c.domain, text, '보통', c.points, null)
+      if (spec.crNoStyle === 'label') row[0] = c.label
+      // 서답형 정답 칸에는 채점 기준 같은 글이 들어간다
+      row[row.length - 1] = '채점기준표 별도 첨부'
+      aoa.push(row)
     })
   }
   aoa.push(['선택형 문항'])

@@ -7,6 +7,7 @@ import { UploadPage } from '../pages/UploadPage'
 import { ResultsPage, type ResultTab } from '../pages/ResultsPage'
 import { PrintReportPage } from '../pages/PrintReportPage'
 import { PrintStudentsPage } from '../pages/PrintStudentsPage'
+import { GuidePage } from '../pages/GuidePage'
 
 export function App() {
   const path = useHashPath()
@@ -27,6 +28,7 @@ export function App() {
   else if (route === '/print/report') page = <PrintReportPage />
   else if ((m = matchPath('/print/student/:id', path))) page = <PrintStudentsPage studentId={m.id!} />
   else if ((m = matchPath('/print/class/:classId', path))) page = <PrintStudentsPage classNo={m.classId!} />
+  else if (route === '/guide') page = <GuidePage />
   else page = <UploadPage />
   return <ErrorBoundary key={route}>{page}</ErrorBoundary>
 }

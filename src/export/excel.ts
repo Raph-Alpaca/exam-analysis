@@ -1,6 +1,7 @@
 import type ExcelJSNS from 'exceljs'
-import { CHOICES, LEVELS, type AnalysisResult, type Exam, type GroupStats, type ItemStats, type StandardStats } from '../model/types'
-import type { Settings } from '../model/settings'
+import { CHOICES, type AnalysisResult, type Exam, type GroupStats, type ItemStats, type StandardStats } from '../model/types'
+import { describeCutoffs, type Settings } from '../model/settings'
+import { fmtPoints } from '../model/format'
 import { discBand } from '../model/thresholds'
 import { describeHeader } from '../parsers/header'
 import { buildNeisTable } from '../stats/neisTable'
@@ -20,7 +21,7 @@ const BORDER: Partial<ExcelJSNS.Borders> = {
 
 interface TableSpec {
   /** 2단 헤더: group 이 같은 연속 열은 위 행에서 병합 */
-  columns: { header: string; group?: string; width?: number; fmt?: string }[]
+  columns: { header: string; group?: string; width?: number; fmt?: string; /** 긴 글 칸: 줄바꿈 */ wrap?: boolean }[]
   rows: Cell[][]
   totalRowIdx?: number[]
 }
@@ -105,6 +106,7 @@ function addTable(ws: Worksheet, startRow: number, spec: TableSpec, caption?: st
       if (typeof v === 'number' && fmt) cell.numFmt = fmt
       if (typeof v === 'number') cell.alignment = { horizontal: 'right' }
       if (v == null) cell.alignment = { horizontal: 'center' }
+      if (typeof v === 'string' && spec.columns[i]?.wrap) cell.alignment = { wrapText: true, vertical: 'top' }
       if (spec.totalRowIdx?.includes(ri)) {
         cell.font = { bold: true }
         cell.fill = TOTAL_FILL
@@ -132,7 +134,7 @@ const ITEM_COLS = (exam: Exam, extra: { header: string; width?: number }[] = [])
   { header: '문항', width: 6 },
   { header: '정답', width: 6 },
   { header: '배점', width: 6 },
-  ...(exam.hasItemInfo ? [{ header: '내용영역', width: 14 }, { header: '성취기준', width: 14 }, { header: '예상난이도', width: 10 }] : []),
+  ...(exam.hasItemInfo ? [{ header: '내용영역', width: 16, wrap: true }, { header: '성취기준', width: 14, wrap: true }, { header: '예상난이도', width: 10 }] : []),
   { header: '정답률(%)', width: 10, fmt: '0.0' },
   { header: '난이도 판정', width: 10 },
   { header: '변별도', width: 8, fmt: '0.00' },
@@ -144,8 +146,8 @@ const ITEM_COLS = (exam: Exam, extra: { header: string; width?: number }[] = [])
 
 function standardRows(list: StandardStats[], result: AnalysisResult, kind: 'standard' | 'domain'): { columns: TableSpec['columns']; rows: Cell[][] } {
   const columns: TableSpec['columns'] = [
-    ...(kind === 'standard' ? [{ header: '성취기준', width: 14 }, { header: '내용', width: 50 }, { header: '내용영역', width: 14 }] : [{ header: '내용영역', width: 18 }]),
-    { header: '문항', width: 14 },
+    ...(kind === 'standard' ? [{ header: '성취기준', width: 14 }, { header: '내용', width: 50, wrap: true }, { header: '내용영역', width: 16, wrap: true }] : [{ header: '내용영역', width: 20, wrap: true }]),
+    { header: '문항', width: 16, wrap: true },
     { header: '문항 수', width: 7 },
     { header: '만점', width: 6 },
     { header: '평균', group: '원점수', width: 8, fmt: '0.0' },
@@ -153,7 +155,7 @@ function standardRows(list: StandardStats[], result: AnalysisResult, kind: 'stan
     { header: '평균', group: '100점 환산', width: 8, fmt: '0.0' },
     { header: '표준편차', group: '100점 환산', width: 8, fmt: '0.0' },
     { header: '전체', group: '성취율(%)', width: 8, fmt: '0.0' },
-    ...LEVELS.map((l) => ({ header: l, group: '성취율(%)', width: 7, fmt: '0.0' })),
+    ...result.activeLevels.map((l) => ({ header: l, group: '성취율(%)', width: 7, fmt: '0.0' })),
     ...result.classNos.map((c) => ({ header: `${c}반`, group: '학급별 성취율(%)', width: 7, fmt: '0.0' })),
   ]
   const rows: Cell[][] = list.map((s) => [
@@ -166,7 +168,7 @@ function standardRows(list: StandardStats[], result: AnalysisResult, kind: 'stan
     fmtOrNull(s.overall.scaled.mean),
     fmtOrNull(s.overall.scaled.sd),
     fmtOrNull(s.overall.rate),
-    ...LEVELS.map((l) => fmtOrNull(s.byLevel[l].rate)),
+    ...result.activeLevels.map((l) => fmtOrNull(s.byLevel[l].rate)),
     ...result.classNos.map((c) => fmtOrNull(s.byClass[c]?.rate)),
   ])
   return { columns, rows }
@@ -187,8 +189,9 @@ export async function buildWorkbook(exam: Exam, result: AnalysisResult, settings
     const ws = wb.addWorksheet('성취도분석')
     let r = addTitle(ws, '성취도분석표', meta, 9)
     r = addTable(ws, r, {
-      columns: [{ header: '문항 수', width: 10 }, { header: '응답자 수', width: 10 }, { header: '검사신뢰도(α, 선다형)', width: 18, fmt: '0.000' }, { header: 'α(배점 가중)', width: 12, fmt: '0.000' }],
-      rows: [[result.mcCount + result.crCount, o.n, fmtOrNull(o.alphaMc), fmtOrNull(o.alphaAll)]],
+      columns: [{ header: '문항 수', width: 10 }, { header: '서답형', width: 24 }, { header: '응답자 수', width: 10 }, { header: '검사신뢰도(α, 선다형)', width: 18, fmt: '0.000' }, { header: 'α(배점 가중)', width: 12, fmt: '0.000' }],
+      // 서답형이 NEIS 총점으로만 있으면 문항 수에 들어가지 않으므로 따로 적는다
+      rows: [[result.mcCount + result.crCount, result.crCount ? `${result.crCount}문항 포함` : hasCr ? `총점 ${fmtPoints(exam.maxima.cr)}점 (문항별 열 없음)` : '없음', o.n, fmtOrNull(o.alphaMc), fmtOrNull(o.alphaAll)]],
     })
     const g = (x: GroupStats) => [fmtOrNull(x.mc.mean), fmtOrNull(x.mc.sd), ...(hasCr ? [fmtOrNull(x.cr.mean), fmtOrNull(x.cr.sd)] : []), fmtOrNull(x.total.mean), fmtOrNull(x.total.sd)]
     r = addTable(
@@ -210,7 +213,7 @@ export async function buildWorkbook(exam: Exam, result: AnalysisResult, settings
           { header: '평균', group: `전체(${exam.maxima.total})`, width: 8, fmt: '0.0' },
           { header: '표준편차', group: `전체(${exam.maxima.total})`, width: 8, fmt: '0.0' },
         ],
-        rows: [['전체', o.n, 100, ...g(o)], ...LEVELS.map((l) => [l, result.byLevel[l].n, fmtOrNull(o.levelPct[l]), ...g(result.byLevel[l])])],
+        rows: [['전체', o.n, 100, ...g(o)], ...result.activeLevels.map((l) => [l, result.byLevel[l].n, fmtOrNull(o.levelPct[l]), ...g(result.byLevel[l])])],
         totalRowIdx: [0],
       },
       '성취수준별 평균·표준편차',
@@ -219,12 +222,12 @@ export async function buildWorkbook(exam: Exam, result: AnalysisResult, settings
       ws,
       r,
       {
-        columns: [{ header: '구분', width: 10 }, { header: '학생 수', width: 8 }, { header: '평균', width: 8, fmt: '0.0' }, { header: '표준편차', width: 8, fmt: '0.0' }, ...LEVELS.map((l) => ({ header: l, group: '성취수준별 비율(%)', width: 7, fmt: '0.0' })), ...LEVELS.map((l) => ({ header: l, group: '성취수준별 학생 수', width: 7 }))],
+        columns: [{ header: '구분', width: 10 }, { header: '학생 수', width: 8 }, { header: '평균', width: 8, fmt: '0.0' }, { header: '표준편차', width: 8, fmt: '0.0' }, ...result.activeLevels.map((l) => ({ header: l, group: '성취수준별 비율(%)', width: 7, fmt: '0.0' })), ...result.activeLevels.map((l) => ({ header: l, group: '성취수준별 학생 수', width: 7 }))],
         rows: [
-          ['전체', o.n, fmtOrNull(o.total.mean), fmtOrNull(o.total.sd), ...LEVELS.map((l) => fmtOrNull(o.levelPct[l])), ...LEVELS.map((l) => o.levelCounts[l])],
+          ['전체', o.n, fmtOrNull(o.total.mean), fmtOrNull(o.total.sd), ...result.activeLevels.map((l) => fmtOrNull(o.levelPct[l])), ...result.activeLevels.map((l) => o.levelCounts[l])],
           ...result.classNos.map((c) => {
             const x = result.byClass[c]!
-            return [`${c}반`, x.n, fmtOrNull(x.total.mean), fmtOrNull(x.total.sd), ...LEVELS.map((l) => fmtOrNull(x.levelPct[l])), ...LEVELS.map((l) => x.levelCounts[l])]
+            return [`${c}반`, x.n, fmtOrNull(x.total.mean), fmtOrNull(x.total.sd), ...result.activeLevels.map((l) => fmtOrNull(x.levelPct[l])), ...result.activeLevels.map((l) => x.levelCounts[l])]
           }),
         ],
         totalRowIdx: [0],
@@ -249,7 +252,7 @@ export async function buildWorkbook(exam: Exam, result: AnalysisResult, settings
     const rows: Cell[][] = []
     for (const s of result.items) {
       rows.push(['전체', o.n, s.no, s.key.join(','), fmtOrNull(s.p), ...CHOICES.map((c) => fmtOrNull(s.pct[c])), fmtOrNull(s.pct.none)])
-      for (const l of LEVELS) {
+      for (const l of result.activeLevels) {
         const x = result.itemsByLevel[l].find((y) => y.no === s.no)!
         rows.push([l, x.n, s.no, s.key.join(','), x.n ? fmtOrNull(x.p) : null, ...CHOICES.map((c) => (x.n ? fmtOrNull(x.pct[c]) : null)), x.n ? fmtOrNull(x.pct.none) : null])
       }
@@ -266,7 +269,7 @@ export async function buildWorkbook(exam: Exam, result: AnalysisResult, settings
     const ws = wb.addWorksheet('성취수준별_상하위')
     const r = addTitle(ws, '성취수준별 정답률 상위·하위 3문항', meta, 6)
     const rows: Cell[][] = []
-    for (const l of ['all', ...LEVELS] as const) {
+    for (const l of ['all', ...result.activeLevels] as const) {
       const stats = l === 'all' ? result.items : result.itemsByLevel[l]
       const n = l === 'all' ? o.n : result.byLevel[l].n
       const tb = result.topBottom[l]
@@ -318,9 +321,9 @@ export async function buildWorkbook(exam: Exam, result: AnalysisResult, settings
         ws,
         r,
         {
-          columns: [{ header: '성취수준', width: 9 }, { header: '학생 수', width: 8 }, { header: '평균', width: 8, fmt: '0.0' }, { header: '표준편차', width: 8, fmt: '0.0' }, { header: '100점 환산', width: 10, fmt: '0.0' }, ...it.values.map((v) => ({ header: `${v}점`, group: '점수별 학생 비율(%)', width: 7, fmt: '0.0' }))],
-          rows: [...LEVELS.map((l) => [l, it.byLevel[l].n, fmtOrNull(it.byLevel[l].mean), fmtOrNull(it.byLevel[l].sd), fmtOrNull(it.byLevel[l].pct), ...it.values.map((v) => (it.byLevel[l].n ? fmtOrNull(it.byLevel[l].dist[String(v)]) : null))]), ['전체', it.overall.n, fmtOrNull(it.overall.mean), fmtOrNull(it.overall.sd), fmtOrNull(it.overall.pct), ...it.values.map((v) => fmtOrNull(it.overall.dist[String(v)]))]],
-          totalRowIdx: [LEVELS.length],
+          columns: [{ header: '성취수준', width: 9 }, { header: '학생 수', width: 8 }, { header: '평균', width: 8, fmt: '0.0' }, { header: '표준편차', width: 8, fmt: '0.0' }, { header: '100점 환산', width: 10, fmt: '0.0' }, ...it.values.map((v) => ({ header: `${fmtPoints(v)}점`, group: '점수별 학생 비율(%)', width: 7, fmt: '0.0' }))],
+          rows: [...result.activeLevels.map((l) => [l, it.byLevel[l].n, fmtOrNull(it.byLevel[l].mean), fmtOrNull(it.byLevel[l].sd), fmtOrNull(it.byLevel[l].pct), ...it.values.map((v) => (it.byLevel[l].n ? fmtOrNull(it.byLevel[l].dist[String(v)]) : null))]), ['전체', it.overall.n, fmtOrNull(it.overall.mean), fmtOrNull(it.overall.sd), fmtOrNull(it.overall.pct), ...it.values.map((v) => fmtOrNull(it.overall.dist[String(v)]))]],
+          totalRowIdx: [result.activeLevels.length],
         },
         `${it.label} (배점 ${it.points})`,
       )
@@ -363,7 +366,8 @@ export async function buildWorkbook(exam: Exam, result: AnalysisResult, settings
     addTable(ws, r, {
       columns: [{ header: '항목', width: 24 }, { header: '값', width: 60 }],
       rows: [
-        ['분할점수 (% 이상)', `A ${settings.cutoffs.AB} / B ${settings.cutoffs.BC} / C ${settings.cutoffs.CD} / D ${settings.cutoffs.DE}`],
+        ['성취수준 단계', settings.levelScheme === 'three' ? '3단계 (A·B·C)' : '5단계 (A~E)'],
+        ['분할점수 (% 이상)', describeCutoffs(settings)],
         ['성취수준 산출 기준', settings.levelBasis === 'subjectMax' ? `과목 만점 (${exam.maxima.total})` : `선다형 만점 (${exam.maxima.mc})`],
         ['표준편차', settings.sdMode === 'population' ? '모집단 (÷N)' : '표본 (÷(N−1))'],
         ['총점 출처', settings.scoreSource === 'neis' ? 'NEIS 영역총점' : '응답으로 재계산'],

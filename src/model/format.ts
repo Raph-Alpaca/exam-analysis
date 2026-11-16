@@ -26,6 +26,15 @@ export function fmtPoints(v: number | null | undefined): string {
   if (!ok(v)) return DASH
   return Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100)
 }
+/**
+ * 문항 구성 설명. 서답형이 NEIS 총점으로만 있을 때(문항별 열 없음)도 서답형이 있음을 알린다.
+ * 예: "선다형", "+ 서답형 3문항", "+ 서답형 (총점 30점)"
+ */
+export function describeCrPart(crCount: number, crMax: number): string {
+  if (crCount > 0) return `+ 서답형 ${crCount}문항`
+  if (crMax > 0) return `+ 서답형 (총점 ${fmtPoints(crMax)}점)`
+  return '선다형'
+}
 export function round(v: number, digits = 2): number {
   const f = 10 ** digits
   return Math.round((v + Number.EPSILON) * f) / f

@@ -1,10 +1,10 @@
 import { useEffect } from 'react'
 import { Icon } from '../components/Icon'
-import { LEVELS } from '../../model/types'
 import { useAppStore } from '../store/useAppStore'
 import { useAnalysis } from '../store/useAnalysis'
 import { alphaBand } from '../../model/thresholds'
-import { fmt1, fmt3, fmtInt } from '../../model/format'
+import { describeCrPart, fmt1, fmt3, fmtInt } from '../../model/format'
+import { cutoffMarks, describeCutoffs } from '../../model/settings'
 import { describeHeader } from '../../parsers/header'
 import { BandBadge, EmptyState, KpiTile, LevelChip } from '../components/basic'
 import { DataTable } from '../components/DataTable'
@@ -113,14 +113,14 @@ export function PrintReportPage() {
           </p>
           <div className="grid grid-kpi">
             <KpiTile label="응답자" value={`${fmtInt(o.n)}명`} />
-            <KpiTile label="문항" value={`${result.mcCount}문항`} sub={result.crCount ? `+ 서답형 ${result.crCount}문항` : '선다형'} />
+            <KpiTile label="문항" value={`${result.mcCount}문항`} sub={describeCrPart(result.crCount, exam.maxima.cr)} />
             <KpiTile label={`평균 (${exam.maxima.total}점)`} value={fmt1(o.total.mean)} sub={`표준편차 ${fmt1(o.total.sd)}`} />
             <KpiTile label="신뢰도 α" value={fmt3(o.alphaMc)} sub={<BandBadge band={alphaBand(o.alphaMc)} />} />
           </div>
           <h3 style={{ marginTop: 14 }}>성취수준 분포</h3>
-          <LevelStackedBar groups={groups} height={Math.max(140, 50 + groups.length * 30)} width={W} />
+          <LevelStackedBar groups={groups} levels={result.activeLevels} height={Math.max(140, 50 + groups.length * 30)} width={W} />
           <h3 style={{ marginTop: 14 }}>점수 분포 (100점 환산)</h3>
-          <ScoreHistogram bins={result.histogram} cutoffs={settings.cutoffs} height={220} width={W} />
+          <ScoreHistogram bins={result.histogram} marks={cutoffMarks(settings)} levels={result.activeLevels} height={220} width={W} />
           <h3 style={{ marginTop: 14 }}>성취수준별 평균·표준편차</h3>
           <LevelStatsTable result={result} exam={exam} />
         </section>
@@ -159,7 +159,7 @@ export function PrintReportPage() {
               </tr>
             </thead>
             <tbody>
-              {(['all', ...LEVELS] as const).map((l) => {
+              {(['all', ...result.activeLevels] as const).map((l) => {
                 const stats = l === 'all' ? result.items : result.itemsByLevel[l]
                 const n = l === 'all' ? o.n : result.byLevel[l].n
                 const f = (nos: number[]) => nos.map((no) => `${no}번 (${fmt1(stats.find((s) => s.no === no)?.p)}%)`).join(', ') || '-'
@@ -196,7 +196,7 @@ export function PrintReportPage() {
           <h2>서답형 문항 분석</h2>
           <div className="stack">
             {result.constructed.map((c) => (
-              <CrItemCard key={c.label} item={c} />
+              <CrItemCard key={c.label} item={c} levels={result.activeLevels} />
             ))}
           </div>
         </section>
@@ -208,7 +208,7 @@ export function PrintReportPage() {
           <h2>분석 설정</h2>
           <ul className="small">
             <li>
-              분할점수: A {settings.cutoffs.AB} / B {settings.cutoffs.BC} / C {settings.cutoffs.CD} / D {settings.cutoffs.DE} (% 이상)
+              성취수준: {settings.levelScheme === 'three' ? '3단계(A·B·C)' : '5단계(A~E)'}, 분할점수 {describeCutoffs(settings)} (% 이상)
             </li>
             <li>성취수준 산출 기준: {settings.levelBasis === 'subjectMax' ? `과목 만점(${exam.maxima.total})` : `선다형 만점(${exam.maxima.mc})`}</li>
             <li>표준편차: {settings.sdMode === 'population' ? '모집단(÷N)' : '표본(÷(N−1))'}</li>

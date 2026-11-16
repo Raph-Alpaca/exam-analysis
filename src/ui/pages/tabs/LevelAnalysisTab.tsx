@@ -1,4 +1,4 @@
-import { LEVELS, type AnalysisResult, type Exam, type ItemStats, type Level } from '../../../model/types'
+import type { AnalysisResult, Exam, ItemStats, Level } from '../../../model/types'
 import { useAppStore } from '../../store/useAppStore'
 import { fmt1, fmtInt } from '../../../model/format'
 import { heatStyle, LEVEL_COLORS } from '../../theme/levels'
@@ -10,6 +10,7 @@ import { ItemDetailDrawer } from './ItemDetailDrawer'
 export type MatrixRow = { no: number; key: number[]; all: number | null; byLevel: Record<Level, number | null>; reversed: boolean }
 
 export function levelMatrixRows(result: AnalysisResult): MatrixRow[] {
+  const LEVELS = result.activeLevels
   return result.items.map((it) => {
     const byLevel = Object.fromEntries(LEVELS.map((l) => {
       const s = result.itemsByLevel[l].find((x) => x.no === it.no)
@@ -34,7 +35,7 @@ export function levelMatrixColumns(result: AnalysisResult): Column<MatrixRow>[] 
     { id: 'no', header: '문항', accessor: (r) => r.no, align: 'center', sortable: true, width: 52 },
     { id: 'key', header: '정답', cell: (r) => r.key.join(',') || '-', align: 'center', width: 48 },
     { id: 'all', header: '전체', accessor: (r) => r.all, cell: (r) => fmt1(r.all), cellStyle: (r) => heatStyle(r.all), sortable: true },
-    ...LEVELS.map(
+    ...result.activeLevels.map(
       (l): Column<MatrixRow> => ({
         id: `l${l}`,
         header: `${l} (${result.byLevel[l].n}명)`,
@@ -75,7 +76,8 @@ export function LevelAnalysisTab({ exam, result }: { exam: Exam; result: Analysi
   const selectedLevel = useAppStore((s) => s.ui.selectedLevel)
   const selectedItem = useAppStore((s) => s.ui.selectedItemNo)
   const setUi = useAppStore((s) => s.setUi)
-  const lv = selectedLevel
+  // 3단계로 바꾼 뒤 D·E가 선택된 채 남아 있으면 전체로 되돌린다
+  const lv = selectedLevel !== 'all' && !result.activeLevels.includes(selectedLevel) ? 'all' : selectedLevel
   const group = lv === 'all' ? result.overview : result.byLevel[lv]
   const stats = lv === 'all' ? result.items : result.itemsByLevel[lv]
   const tb = result.topBottom[lv]
@@ -90,7 +92,7 @@ export function LevelAnalysisTab({ exam, result }: { exam: Exam; result: Analysi
           <button type="button" onClick={() => setUi({ selectedLevel: 'all' })} aria-pressed={lv === 'all'}>
             전체
           </button>
-          {LEVELS.map((l) => (
+          {result.activeLevels.map((l) => (
             <button key={l} type="button" onClick={() => setUi({ selectedLevel: l })} aria-pressed={lv === l}>
               <span className="sw" style={{ background: LEVEL_COLORS[l] }} aria-hidden="true" />
               {l}

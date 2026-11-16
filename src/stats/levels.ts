@@ -1,8 +1,14 @@
 import { LEVELS, type Exam, type Level } from '../model/types'
-import type { Cutoffs, Settings } from '../model/settings'
+import type { Cutoffs, Cutoffs3, Settings } from '../model/settings'
 import type { Scored } from './scoring'
 
 const EPS = 1e-9
+const LEVELS3: readonly Level[] = ['A', 'B', 'C']
+
+/** 설정된 단계에서 실제로 쓰는 성취수준 (5단계 A~E / 3단계 A~C). 화면·보고서는 이 목록만 보여 준다. */
+export function activeLevels(settings: Pick<Settings, 'levelScheme'>): readonly Level[] {
+  return settings.levelScheme === 'three' ? LEVELS3 : LEVELS
+}
 
 /** 성취수준 산출 기준 점수(%) */
 export function basisPct(s: Scored, exam: Exam, settings: Settings): number {
@@ -23,8 +29,16 @@ export function assignLevel(pct: number, c: Cutoffs): Level {
   return 'E'
 }
 
+/** 3단계 교과(체육·음악·미술): A/B, B/C 분할점수만 쓴다 */
+export function assignLevel3(pct: number, c: Cutoffs3): Level {
+  if (pct + EPS >= c.AB) return 'A'
+  if (pct + EPS >= c.BC) return 'B'
+  return 'C'
+}
+
 export function levelOf(s: Scored, exam: Exam, settings: Settings): Level {
-  return assignLevel(basisPct(s, exam, settings), settings.cutoffs)
+  const pct = basisPct(s, exam, settings)
+  return settings.levelScheme === 'three' ? assignLevel3(pct, settings.cutoffs3) : assignLevel(pct, settings.cutoffs)
 }
 
 export function emptyLevelRecord<T>(make: () => T): Record<Level, T> {
@@ -34,7 +48,9 @@ export function emptyLevelRecord<T>(make: () => T): Record<Level, T> {
 }
 
 /** 수준에 해당하는 분할점수 (리포트 표기용) */
-export function cutoffFor(level: Level, c: Cutoffs): number | null {
+export function cutoffFor(level: Level, settings: Pick<Settings, 'levelScheme' | 'cutoffs' | 'cutoffs3'>): number | null {
+  if (settings.levelScheme === 'three') return level === 'A' ? settings.cutoffs3.AB : level === 'B' ? settings.cutoffs3.BC : null
+  const c = settings.cutoffs
   switch (level) {
     case 'A':
       return c.AB

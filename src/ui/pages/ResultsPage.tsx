@@ -156,10 +156,10 @@ export function ResultsPage({ tab }: { tab: ResultTab }) {
             <dt>선다형</dt>
             <dd>{result.mcCount}문항</dd>
           </div>
-          {result.crCount > 0 && (
+          {(result.crCount > 0 || exam.maxima.cr > 0) && (
             <div>
               <dt>서답형</dt>
-              <dd>{result.crCount}문항</dd>
+              <dd>{result.crCount > 0 ? `${result.crCount}문항` : `총점 ${exam.maxima.cr}점`}</dd>
             </div>
           )}
           <div>

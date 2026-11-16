@@ -22,6 +22,7 @@ import { ResultsPage, type ResultTab } from '../src/ui/pages/ResultsPage'
 import { PrintReportPage } from '../src/ui/pages/PrintReportPage'
 import { PrintStudentsPage } from '../src/ui/pages/PrintStudentsPage'
 import { UploadPage } from '../src/ui/pages/UploadPage'
+import { GuidePage } from '../src/ui/pages/GuidePage'
 
 let root: Root | null = null
 let container: HTMLDivElement | null = null
@@ -136,6 +137,27 @@ const scenarios: Scenario[] = [
     files: async () => [await answers(makeAnswerSheet({ classNo: 1, nItems: N, nStudents: 9, style: '_2', seed: 5, keys, points, absent: [0, 1] }), 'a.xlsx')],
   },
   {
+    name: '3단계(A·B·C) 교과 + 서·논술형 구역 + 서답형 총점만',
+    settings: { levelScheme: 'three' },
+    files: async () => {
+      const sh = [1, 2].map((c) => makeAnswerSheet({ classNo: c, nItems: N, nStudents: 16, style: '_2', seed: 70 + c, keys, points, crTotalMax: 40, subject: '음악', crScoreHeader: '서·논술형점수' }))
+      const info = makeItemInfo({
+        nItems: N,
+        keys,
+        points,
+        subject: '음악',
+        standards: Array.from({ length: N }, (_, i) => [codes[i % 3]!]),
+        standardText: STD,
+        domains: Array.from({ length: N }, (_, i) => `영역${i % 2}`),
+        difficulties: Array.from({ length: N }, () => '보통' as const),
+        crItems: [{ label: '서답1', points: 40, standards: [codes[1]!], domain: '영역1' }],
+        crSectionTitle: '서·논술형 문항',
+        crNoStyle: 'label',
+      })
+      return [...(await Promise.all(sh.map((s, i) => answers(s, `${i + 1}반.xlsx`)))), { fileName: 'info.xlsx', kind: 'itemInfo' as const, itemInfo: parseItemInfo(await gridFromAoa(info), 'info.xlsx') }]
+    },
+  },
+  {
     name: '한 반 전체 결시 (분석할 학생 0명)',
     files: async () => [await answers(makeAnswerSheet({ classNo: 1, nItems: N, nStudents: 4, style: '_2', seed: 6, keys, points, absent: [0, 1, 2, 3] }), 'a.xlsx')],
   },
@@ -172,6 +194,12 @@ describe('화면 렌더링 점검', () => {
       }
       for (const tab of TABS) {
         const text = await render(<ResultsPage tab={tab} />)
+        if (settings.levelScheme === 'three') {
+          // 3단계에서는 D·E 수준이 화면에 나오지 않는다
+          if (tab === 'overview') expect(text).toMatch(/3단계\(A·B·C[\s\S]*서답형 \(총점 40점\)|서답형 \(총점 40점\)[\s\S]*3단계\(A·B·C/)
+          if (tab === 'levels') expect(text).not.toMatch(/[DE] \(0명\)/)
+          expect(container!.querySelector('[aria-label="성취수준 D"], [aria-label="성취수준 E"]'), tab).toBeNull()
+        }
         expect(text, tab).toContain('분석 설정') // 설정 드로어가 열린 상태로 그려짐
         expect(text, tab).not.toContain('분석할 자료가 없습니다')
         expect(text, tab).toMatch(expectText[tab])
@@ -183,6 +211,7 @@ describe('화면 렌더링 점검', () => {
       expect(await render(<PrintStudentsPage classNo={e.classes[0]!.classNo} />)).toContain('학생 리포트')
       if (firstStudent) expect(await render(<PrintStudentsPage studentId={firstStudent} />)).toContain(result.students[0]!.student.name)
       expect(await render(<UploadPage />)).toContain('올린 파일')
+      expect(await render(<GuidePage />)).toMatch(/사용 안내[\s\S]*필요한 파일[\s\S]*계산 방식/)
       const wb = await buildWorkbook(e, result, settings)
       const buf = await wb.xlsx.writeBuffer()
       expect(buf.byteLength).toBeGreaterThan(5000)

@@ -114,10 +114,10 @@ export function EmptyState({ children }: { children: ReactNode }) {
   return <div className="empty">{children}</div>
 }
 
-export function LevelLegend({ extra }: { extra?: ReactNode }) {
+export function LevelLegend({ extra, levels = ['A', 'B', 'C', 'D', 'E'] }: { extra?: ReactNode; levels?: readonly Level[] }) {
   return (
     <div className="legend-list" aria-label="성취수준 색 범례">
-      {(['A', 'B', 'C', 'D', 'E'] as Level[]).map((l) => (
+      {levels.map((l) => (
         <span key={l}>
           <span className="sw" style={{ background: LEVEL_COLORS[l] }} />
           {l}

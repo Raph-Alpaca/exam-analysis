@@ -3,6 +3,7 @@ import type { ExamHeader, KeyMode, Student, Warning } from '../model/types'
 import { parseExamHeader } from './header'
 import { DEFAULT_MULTI_CODES, decodeKey, decodeResponse, parseLegendRow, type MultiLegend } from './legend'
 import { ParseError } from './errors'
+import { RE_CR_LABEL, RE_CR_SCORE, RE_MC_SCORE } from './terms'
 
 export interface McItemCol {
   no: number
@@ -31,10 +32,11 @@ export interface AnswerSheetParse {
 
 const RE_CLASS_SEAT = /^\s*0*(\d+)\s*[\/\-]\s*0*(\d+)\s*$/
 const RE_INT = /^\d+$/
-const RE_MC_SCORE = /선택형\s*점수|선다형\s*점수/
-const RE_CR_SCORE = /서답형\s*점수|서술형\s*점수/
 const RE_ETC_SCORE = /기타\s*점수/
 const RE_TOTAL = /영역\s*총점|과목\s*총점|^총점$/
+const NO_MC_HINT = '선다형 문항이 없는(전부 서답형인) 시험은 지원하지 않습니다.'
+
+const round2 = (v: number) => Math.round(v * 100) / 100
 
 function findHeaderRow(grid: CellGrid): number {
   return grid.findRow((t) => {
@@ -43,12 +45,38 @@ function findHeaderRow(grid: CellGrid): number {
   }, 1, Math.min(grid.rows, 40))
 }
 
+/** 문항번호 머리글 행의 번호 목록 — 오름차순 정수 3개 이상이고 정답·배점 행이 아닐 때만 */
+function itemNumbersOf(texts: string[]): number[] | null {
+  if (!texts.some((x) => /번호/.test(x))) return null
+  if (texts.some((x) => x === '정답' || x === '배점')) return null
+  const ints = texts.filter((x) => RE_INT.test(x)).map(Number)
+  if (ints.length < 3) return null
+  for (let i = 1; i < ints.length; i++) if (ints[i]! <= ints[i - 1]!) return null
+  return ints
+}
+
 export function parseAnswerSheet(grid: CellGrid, fileName: string): AnswerSheetParse {
   const warnings: Warning[] = []
   const hdrRow = findHeaderRow(grid)
-  if (!hdrRow) throw new ParseError('no-header', `${fileName}: 정오표의 문항번호 헤더 행(반/번호 … 번호 1 2 3 …)을 찾지 못했습니다.`)
+  if (!hdrRow) {
+    // 점수 열은 있는데 문항번호가 없으면 선다형이 없는 시험
+    const scoreOnly = grid.findRow((t) => t.some((x) => /번호/.test(x)) && t.some((x) => RE_TOTAL.test(x.replace(/\s+/g, '')) || RE_CR_SCORE.test(x)), 1, Math.min(grid.rows, 40))
+    if (scoreOnly) throw new ParseError('no-items', `${fileName}: ${NO_MC_HINT}`)
+    throw new ParseError('no-header', `${fileName}: 정오표의 문항번호 헤더 행(반/번호 … 번호 1 2 3 …)을 찾지 못했습니다.`)
+  }
   const hdr = grid.rowTexts(hdrRow)
   const firstItemCol = hdr.findIndex((x) => RE_INT.test(x)) + 1
+
+  // 문항이 많아 표가 둘로 나뉜 양식(문항번호가 다른 머리글 행이 또 있음)은 잘못 읽지 않도록 멈춘다.
+  const firstNos = itemNumbersOf(hdr)
+  if (firstNos) {
+    for (let r = hdrRow + 1; r <= grid.rows; r++) {
+      const nos = itemNumbersOf(grid.rowTexts(r))
+      if (nos && nos.join(',') !== firstNos.join(',')) {
+        throw new ParseError('split-table', `${fileName}: 문항번호가 다른 머리글 행이 ${r}행에 또 있습니다(문항이 여러 표로 나뉜 양식). 이 양식은 아직 읽지 못합니다. NEIS에서 "XLS data"로 다시 저장해 올려 주세요.`)
+      }
+    }
+  }
 
   // 메타 행: 학년도 … 를 포함하는 행
   let header: ExamHeader = { raw: '' }
@@ -94,7 +122,7 @@ export function parseAnswerSheet(grid: CellGrid, fileName: string): AnswerSheetP
     const keyText = grid.text(keyRow, c)
     if (RE_INT.test(h)) {
       const key = decodeKey(keyText, legend)
-      if (!key && keyText === '' && points != null && points > 0 && mcItems.length > 0 && /서답|서술/.test(hdr.slice(firstItemCol - 1, c - 1).join(''))) {
+      if (!key && keyText === '' && points != null && points > 0 && mcItems.length > 0 && RE_CR_LABEL.test(hdr.slice(firstItemCol - 1, c - 1).join(''))) {
         // 선다형 뒤에 숫자 머리글만 있고 정답이 없는 열: 서답형으로 간주
         crItems.push({ no: Number(h), label: `서답${crItems.length + 1}`, col: c, points })
         continue
@@ -112,7 +140,7 @@ export function parseAnswerSheet(grid: CellGrid, fileName: string): AnswerSheetP
       crItems.push({ no: crItems.length + 1, label: h, col: c, points })
     }
   }
-  if (mcItems.length === 0) throw new ParseError('no-items', `${fileName}: 선다형 문항 열을 찾지 못했습니다.`)
+  if (mcItems.length === 0) throw new ParseError('no-items', `${fileName}: 선다형 문항 열을 찾지 못했습니다. ${NO_MC_HINT}`)
 
   // 만점
   const maxima = {
@@ -120,6 +148,16 @@ export function parseAnswerSheet(grid: CellGrid, fileName: string): AnswerSheetP
     cr: crScoreCol ? grid.num(ptsRow, crScoreCol) : null,
     etc: etcScoreCol ? grid.num(ptsRow, etcScoreCol) : null,
     total: totalCol ? grid.num(ptsRow, totalCol) : null,
+  }
+  // 서답형 점수 열을 못 찾았는데 총점이 선택형+기타보다 크면, 그 차이를 서답형으로 본다.
+  let deriveCr = false
+  if (!crScoreCol && crItems.length === 0 && maxima.total != null && maxima.mc != null) {
+    const rest = round2(maxima.total - maxima.mc - (maxima.etc ?? 0))
+    if (rest > 0.005) {
+      deriveCr = true
+      maxima.cr = rest
+      warnings.push({ level: 'info', code: 'cr-column-derived', message: `${fileName}: 서답형 점수 열을 찾지 못해 "영역총점 − 선택형점수 − 기타점수"(만점 ${rest})를 서답형 점수로 썼습니다.` })
+    }
   }
 
   // 메타 열 결정 (반/번호, 학번, 이름)
@@ -163,9 +201,10 @@ export function parseAnswerSheet(grid: CellGrid, fileName: string): AnswerSheetP
     const mcCalc = mcItems.reduce((s, it, i) => s + (responses[i]!.k === 'correct' ? (it.points ?? 0) : 0), 0)
     const crCalc = crScores ? crScores.reduce((s, v) => s + v, 0) : 0
     const mc = mcScoreCol ? grid.num(r, mcScoreCol) : null
-    const cr = crScoreCol ? grid.num(r, crScoreCol) : null
     const etc = etcScoreCol ? grid.num(r, etcScoreCol) : null
     const total = totalCol ? grid.num(r, totalCol) : null
+    let cr = crScoreCol ? grid.num(r, crScoreCol) : null
+    if (deriveCr && total != null && mc != null) cr = Math.max(0, round2(total - mc - (etc ?? 0)))
     if (mc == null || total == null) missingScore++
     students.push({
       id: `${classNo}/${seatNo}`,

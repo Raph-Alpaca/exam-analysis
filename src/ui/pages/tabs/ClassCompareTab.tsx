@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CHOICES, LEVELS, type AnalysisResult, type Exam, type GroupStats } from '../../../model/types'
+import { CHOICES, type AnalysisResult, type Exam, type GroupStats } from '../../../model/types'
 import { useAppStore } from '../../store/useAppStore'
 import { useFullAnalysis } from '../../store/useAnalysis'
 import { fmt1, fmtInt } from '../../../model/format'
@@ -19,7 +19,7 @@ export function ClassStatsTable({ result, caption }: { result: AnalysisResult; c
     { id: 'n', header: '학생 수', accessor: (r) => r.g.n, cell: (r) => fmtInt(r.g.n), sortable: true },
     { id: 'mean', header: '평균', accessor: (r) => r.g.total.mean, cell: (r) => fmt1(r.g.total.mean), sortable: true },
     { id: 'sd', header: '표준편차', accessor: (r) => r.g.total.sd, cell: (r) => fmt1(r.g.total.sd), sortable: true },
-    ...LEVELS.map(
+    ...result.activeLevels.map(
       (l): Column<ClassRow> => ({
         id: `l${l}`,
         header: <LevelChip level={l} />,

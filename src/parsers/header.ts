@@ -40,6 +40,21 @@ export function parseExamHeader(raw: string): ExamHeader {
   return out
 }
 
+/**
+ * "고사 :  중간고사   교과목 :  과학" 행 해석.
+ * 보통 한 칸에 모두 들어 있으므로 칸 단위로 먼저 읽어 "생활 일본어"처럼 공백이 있는 교과목도 끝까지 읽는다.
+ * 칸이 나뉜 양식이면 행 전체에서 읽는다(이때 교과목은 첫 낱말).
+ */
+export function parseExamSubjectRow(texts: readonly string[]): { examName: string; subject: string } | null {
+  for (const cell of texts) {
+    const m = /고사\s*:\s*(.+?)\s+교과목\s*:\s*(.+?)\s*$/.exec(cell)
+    if (m) return { examName: m[1]!.trim(), subject: m[2]!.replace(/\s+/g, ' ').trim() }
+  }
+  const line = texts.filter((x) => x !== '').join('   ')
+  const m = /고사\s*:\s*(.+?)\s+교과목\s*:\s*(\S+)/.exec(line)
+  return m ? { examName: m[1]!.trim(), subject: m[2]!.trim() } : null
+}
+
 export function describeHeader(h: ExamHeader): string {
   const bits: string[] = []
   if (h.year) bits.push(`${h.year}학년도`)

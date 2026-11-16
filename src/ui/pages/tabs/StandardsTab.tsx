@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LEVELS, type AnalysisResult, type Exam, type StandardStats } from '../../../model/types'
+import type { AnalysisResult, Exam, StandardStats } from '../../../model/types'
 import { fmt1, fmtInt, fmtPoints } from '../../../model/format'
 import { heatStyle } from '../../theme/levels'
 import { EmptyState, HeatLegend, SectionTitle } from '../../components/basic'
@@ -16,13 +16,13 @@ export function standardColumns(result: AnalysisResult, opts: { kind: 'standard'
     cols.push({ id: 'code', header: '내용영역', accessor: (r) => r.code, cell: (r) => <strong>{r.code}</strong>, sortable: true })
   }
   cols.push(
-    { id: 'items', header: '문항', cell: (r) => <span className="small nowrap">{r.itemNos.join(', ')}</span>, accessor: (r) => r.itemNos.length, sortable: true },
+    { id: 'items', header: '문항', cell: (r) => <span className="small">{r.itemNos.join(', ')}</span>, accessor: (r) => r.itemNos.length, sortable: true },
     { id: 'n', header: '문항 수', accessor: (r) => r.itemNos.length, cell: (r) => fmtInt(r.itemNos.length) },
     { id: 'max', header: '만점', accessor: (r) => r.maxPoints, cell: (r) => fmtPoints(r.maxPoints) },
     { id: 'rawm', header: '평균', group: '원점수', accessor: (r) => r.overall.raw.mean, cell: (r) => fmt1(r.overall.raw.mean) },
     { id: 'raws', header: '표준편차', group: '원점수', accessor: (r) => r.overall.raw.sd, cell: (r) => fmt1(r.overall.raw.sd) },
     { id: 'rate', header: '전체', group: '성취율(%)', accessor: (r) => r.overall.rate, cell: (r) => <strong>{fmt1(r.overall.rate)}</strong>, cellStyle: (r) => heatStyle(r.overall.rate), sortable: true },
-    ...LEVELS.map(
+    ...result.activeLevels.map(
       (l): Column<StandardStats> => ({
         id: `l${l}`,
         header: `${l} (${result.byLevel[l].n})`,
@@ -64,7 +64,7 @@ export function StandardsTab({ exam, result }: { exam: Exam; result: AnalysisRes
           <SectionTitle title="성취기준별 성취율" right={<label className="checkbox small"><input type="checkbox" checked={byLevel} onChange={(e) => setByLevel(e.target.checked)} /> 성취수준별로 보기</label>}>
             성취율 = 해당 성취기준 문항의 획득 점수 합 ÷ 배점 합 × 100
           </SectionTitle>
-          <StandardAchievementBar stats={result.standards} byLevel={byLevel} />
+          <StandardAchievementBar stats={result.standards} byLevel={byLevel} levels={result.activeLevels} />
         </section>
         <section className="card">
           <SectionTitle title="보완이 필요한 성취기준">전체 성취율이 가장 낮은 3개</SectionTitle>
@@ -75,7 +75,7 @@ export function StandardsTab({ exam, result }: { exam: Exam; result: AnalysisRes
                 <div className="small muted">{s.text}</div>
                 <div className="small row" style={{ gap: '2px 14px' }}>
                   <span>문항 {s.itemNos.join(', ')}</span>
-                  <span>수준별 {LEVELS.map((l) => `${l} ${fmt1(s.byLevel[l].rate)}`).join(' / ')}</span>
+                  <span>수준별 {result.activeLevels.map((l) => `${l} ${fmt1(s.byLevel[l].rate)}`).join(' / ')}</span>
                 </div>
               </li>
             ))}

@@ -1,6 +1,5 @@
 import { useMemo } from 'react'
 import { CHOICES, LEVELS, type Bin, type GroupStats, type ItemStats, type Level, type StandardStats } from '../../model/types'
-import type { Cutoffs } from '../../model/settings'
 import { LEVEL_COLORS, LEVEL_TEXT, TONE_COLORS } from '../theme/levels'
 import { CHART_INK, EChart, type ChartOption } from './EChart'
 
@@ -13,19 +12,19 @@ const AXIS_NAME = { color: CHART_INK.muted, fontSize: 11.5 }
 const SHADOW_POINTER = { type: 'shadow' as const, shadowStyle: { color: 'rgba(23,33,58,0.05)' } }
 
 /** 성취수준 색으로 쌓은 점수(100점 환산) 분포 + 분할점수 선 */
-export function ScoreHistogram({ bins, cutoffs, height = 280, width }: { bins: Bin[]; cutoffs: Cutoffs; height?: number; width?: number }) {
+export function ScoreHistogram({ bins, marks, levels = LEVELS, height = 280, width }: { bins: Bin[]; marks: { level: Level; value: number }[]; levels?: readonly Level[]; height?: number; width?: number }) {
   const option = useMemo<ChartOption>(() => {
     const cats = bins.map((b, i) => (i === bins.length - 1 ? `${b.from}~100` : `${b.from}~${b.to - 1}`))
     const cutIdx = (v: number) => Math.min(bins.length - 1, Math.floor(v / (bins[0]!.to - bins[0]!.from))) - 0.5
     return {
       tooltip: { trigger: 'axis', axisPointer: SHADOW_POINTER, valueFormatter: (v) => `${v}명` },
-      legend: { ...LEGEND, data: LEVELS.map((l) => `${l}`) },
+      legend: { ...LEGEND, data: levels.map((l) => `${l}`) },
       grid: { left: 46, right: 16, top: 40, bottom: 40 },
       // 눈금 글자 간격은 ECharts가 차트 폭에 맞춰 정한다(좁은 화면에서 겹치지 않게)
       xAxis: { type: 'category', data: cats, name: '점수 (100점 환산)', nameLocation: 'middle', nameGap: 26, nameTextStyle: AXIS_NAME, axisLabel: { ...AXIS_LABEL, interval: 'auto', hideOverlap: true }, axisLine: AXIS_LINE, axisTick: { show: false } },
       // 축 제목(학생 수)은 범례와 겹치므로 카드 설명에 적고, 눈금에 '명'을 붙인다
       yAxis: { type: 'value', minInterval: 1, axisLabel: { ...AXIS_LABEL, formatter: '{value}명' }, splitLine: SPLIT_LINE },
-      series: LEVELS.map((l) => ({
+      series: levels.map((l) => ({
         name: l,
         type: 'bar' as const,
         stack: 'lv',
@@ -39,22 +38,17 @@ export function ScoreHistogram({ bins, cutoffs, height = 280, width }: { bins: B
                 silent: true,
                 lineStyle: { color: '#8b93a6', type: [4, 3] as number[], width: 1 },
                 label: { formatter: '{b}', position: 'end' as const, color: CHART_INK.muted, fontSize: 11 },
-                data: [
-                  { name: `A ${cutoffs.AB}`, xAxis: cutIdx(cutoffs.AB) },
-                  { name: `B ${cutoffs.BC}`, xAxis: cutIdx(cutoffs.BC) },
-                  { name: `C ${cutoffs.CD}`, xAxis: cutIdx(cutoffs.CD) },
-                  { name: `D ${cutoffs.DE}`, xAxis: cutIdx(cutoffs.DE) },
-                ],
+                data: marks.map((m) => ({ name: `${m.level} ${m.value}`, xAxis: cutIdx(m.value) })),
               }
             : undefined,
       })),
     }
-  }, [bins, cutoffs])
+  }, [bins, marks, levels])
   return <EChart option={option} height={height} width={width} ariaLabel="점수 분포 히스토그램 (성취수준별 색)" />
 }
 
 /** 집단(학급)별 성취수준 비율: 한 줄을 100%로 나눈 띠 */
-export function LevelStackedBar({ groups, height = 260, width }: { groups: { name: string; stats: GroupStats }[]; height?: number; width?: number }) {
+export function LevelStackedBar({ groups, levels = LEVELS, height = 260, width }: { groups: { name: string; stats: GroupStats }[]; levels?: readonly Level[]; height?: number; width?: number }) {
   const option = useMemo<ChartOption>(
     () => ({
       tooltip: { trigger: 'axis', axisPointer: SHADOW_POINTER, valueFormatter: (v) => `${Number(v).toFixed(1)}%` },
@@ -62,7 +56,7 @@ export function LevelStackedBar({ groups, height = 260, width }: { groups: { nam
       grid: { left: 48, right: 16, top: 36, bottom: 28 },
       xAxis: { type: 'value', max: 100, axisLabel: { ...AXIS_LABEL, formatter: '{value}%' }, splitLine: SPLIT_LINE },
       yAxis: { type: 'category', data: groups.map((g) => g.name), inverse: true, axisLabel: { ...AXIS_LABEL, color: CHART_INK.secondary, fontSize: 12.5 }, axisLine: { show: false }, axisTick: { show: false } },
-      series: LEVELS.map((l) => ({
+      series: levels.map((l) => ({
         name: l,
         type: 'bar' as const,
         stack: 'lv',
@@ -75,7 +69,7 @@ export function LevelStackedBar({ groups, height = 260, width }: { groups: { nam
         barWidth: 22,
       })),
     }),
-    [groups],
+    [groups, levels],
   )
   return <EChart option={option} height={height} width={width} ariaLabel="집단별 성취수준 비율" />
 }
@@ -124,11 +118,11 @@ export function ItemAccuracyBar({ items, height = 240, width }: { items: ItemSta
 }
 
 /** 성취기준(또는 내용영역)별 성취율 가로 막대 — 전체 또는 성취수준별 */
-export function StandardAchievementBar({ stats, byLevel, height, width }: { stats: StandardStats[]; byLevel?: boolean; height?: number; width?: number }) {
+export function StandardAchievementBar({ stats, byLevel, levels = LEVELS, height, width }: { stats: StandardStats[]; byLevel?: boolean; levels?: readonly Level[]; height?: number; width?: number }) {
   const option = useMemo<ChartOption>(() => {
     const cats = stats.map((s) => (s.code.length > 18 ? s.code.slice(0, 17) + '…' : s.code))
     const series = byLevel
-      ? LEVELS.map((l) => ({ name: l, type: 'bar' as const, data: stats.map((s) => (s.byLevel[l].rate == null ? null : Math.round(s.byLevel[l].rate! * 10) / 10)), itemStyle: { color: LEVEL_COLORS[l], borderRadius: [0, 2, 2, 0] }, barMaxWidth: 8 }))
+      ? levels.map((l) => ({ name: l, type: 'bar' as const, data: stats.map((s) => (s.byLevel[l].rate == null ? null : Math.round(s.byLevel[l].rate! * 10) / 10)), itemStyle: { color: LEVEL_COLORS[l], borderRadius: [0, 2, 2, 0] }, barMaxWidth: 8 }))
       : [
           {
             name: '전체',
@@ -147,7 +141,7 @@ export function StandardAchievementBar({ stats, byLevel, height, width }: { stat
       yAxis: { type: 'category', data: cats, inverse: true, axisLabel: { ...AXIS_LABEL, color: CHART_INK.secondary, fontSize: 11.5 }, axisLine: AXIS_LINE, axisTick: { show: false } },
       series,
     }
-  }, [stats, byLevel])
-  const h = height ?? Math.max(160, 40 + stats.length * (byLevel ? 58 : 28))
+  }, [stats, byLevel, levels])
+  const h = height ?? Math.max(160, 40 + stats.length * (byLevel ? 18 + levels.length * 8 : 28))
   return <EChart option={option} height={h} width={width} ariaLabel="성취기준별 성취율" />
 }

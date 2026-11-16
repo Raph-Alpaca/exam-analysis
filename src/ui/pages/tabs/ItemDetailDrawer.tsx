@@ -13,7 +13,7 @@ export function ItemDetailDrawer({ exam, result, no, onClose }: { exam: Exam; re
   if (!item || !stat || no == null) return null
   const byLevel = Object.fromEntries(LEVELS.map((l) => [l, result.itemsByLevel[l].find((s) => s.no === no)!])) as Record<Level, ItemStats>
   type Row = { label: string; level?: Level; s: ItemStats }
-  const rows: Row[] = LEVELS.map((l) => ({ label: l, level: l, s: byLevel[l] }))
+  const rows: Row[] = result.activeLevels.map((l) => ({ label: l, level: l, s: byLevel[l] }))
   const cols: Column<Row>[] = [
     { id: 'lv', header: '성취수준', cell: (r) => (r.level ? <LevelChip level={r.level} /> : <strong>{r.label}</strong>), align: 'center' },
     { id: 'n', header: '학생 수', accessor: (r) => r.s.n, cell: (r) => fmtInt(r.s.n) },
@@ -40,7 +40,7 @@ export function ItemDetailDrawer({ exam, result, no, onClose }: { exam: Exam; re
           <Badge>배점 {fmtPoints(item.points)}</Badge>
           {item.difficulty && <Badge>예상 {item.difficulty}</Badge>}
           {stat.observed3 && <Badge>실제 {stat.observed3}</Badge>}
-          {item.domain && <Badge>{item.domain}</Badge>}
+          {item.domain && <span className="badge badge-wrap">{item.domain}</span>}
           <Badge tone={discBand(stat.disc)?.tone ?? 'neutral'}>변별도 {fmt2(stat.disc)}</Badge>
           {stat.flags.map((f) => (
             <Badge key={f.code} tone={f.severity === 'danger' ? 'danger' : f.severity === 'warn' ? 'warn' : 'neutral'}>

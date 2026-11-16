@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-/** GitHub Pages 에는 SPA 폴백이 없으므로 해시 라우팅을 쓴다. */
+/** 어느 정적 호스팅에서도 서버 설정(SPA 폴백) 없이 동작하도록 해시 라우팅을 쓴다. */
 export function currentPath(): string {
   const h = window.location.hash.replace(/^#/, '')
   return h.startsWith('/') ? h : '/' + h

@@ -24,12 +24,12 @@ export function responseText(r: Response): string {
 export function StudentReport({ exam, result, student, settings, compact }: { exam: Exam; result: AnalysisResult; student: StudentResult; settings: Settings; compact?: boolean }) {
   const st = student.student
   const cls = result.byClass[st.classNo]
-  const cut = cutoffFor(student.level, settings.cutoffs)
+  const cut = cutoffFor(student.level, settings)
   const hasCr = exam.maxima.cr > 0
   const wrongCols: Column<(typeof student.wrongItems)[number]>[] = [
     { id: 'no', header: '문항', accessor: (r) => r.no, align: 'center', width: 48 },
     ...(exam.items.some((i) => i.domain) ? ([{ id: 'domain', header: '내용영역', accessor: (r) => r.domain ?? '' }] as Column<(typeof student.wrongItems)[number]>[]) : []),
-    ...(exam.hasItemInfo ? ([{ id: 'std', header: '성취기준', cell: (r) => <span className="small nowrap">{r.standards.join(' ')}</span> }] as Column<(typeof student.wrongItems)[number]>[]) : []),
+    ...(exam.hasItemInfo ? ([{ id: 'std', header: '성취기준', cell: (r) => <span className="small">{r.standards.join(' ')}</span> }] as Column<(typeof student.wrongItems)[number]>[]) : []),
     { id: 'my', header: '내 답', cell: (r) => responseText(r.response), align: 'center' },
     { id: 'key', header: '정답', cell: (r) => r.key.join(',') || '-', align: 'center' },
     { id: 'pts', header: '배점', accessor: (r) => r.points, cell: (r) => fmtPoints(r.points) },

@@ -1,8 +1,8 @@
 import { LEVELS, type AnalysisResult, type Bin, type Exam, type GroupStats, type ItemStats, type Level, type Student, type TopBottom, type Warning } from '../model/types'
-import type { Settings } from '../model/settings'
+import { describeCutoffs, type Settings } from '../model/settings'
 import { meanSd } from './descriptive'
 import { computeItemStats, topBottomItems } from './items'
-import { basisPct, emptyLevelRecord, levelOf } from './levels'
+import { activeLevels, basisPct, emptyLevelRecord, levelOf } from './levels'
 import { alphaAll, alphaMc } from './reliability'
 import { crItemsOf, mcItemsOf, scoreStudents, type Scored } from './scoring'
 import { computeStandards } from './standards'
@@ -11,6 +11,9 @@ import { computeStudentResults } from './students'
 import { describeStudent, partitionStudents } from './inclusion'
 
 export const HISTOGRAM_BIN = 5
+
+/** 중학교에서 3단계(A·B·C)로 평가하는 교과 */
+const RE_THREE_LEVEL_SUBJECT = /체육|음악|미술/
 
 function groupStats(scored: readonly Scored[], levels: readonly Level[], settings: Settings): GroupStats {
   const counts = emptyLevelRecord(() => 0)
@@ -79,6 +82,22 @@ export function analyze(exam: Exam, settings: Settings, opts: AnalyzeOptions = {
     warnings.push({ level: 'error', code: 'no-students', message: '분석할 학생이 없습니다. 올린 정오표와 학급 선택을 확인해 주세요.' })
   }
 
+  // 성취수준 단계 설정은 브라우저에 남으므로, 다른 교과를 올렸을 때 뒤바뀌지 않도록 알린다.
+  const threeLevelSubject = RE_THREE_LEVEL_SUBJECT.test(exam.header.subject ?? '')
+  if (settings.levelScheme === 'three') {
+    warnings.push({
+      level: threeLevelSubject ? 'info' : 'warn',
+      code: 'level-scheme-three',
+      message: `성취수준을 3단계(A·B·C, 분할점수 ${describeCutoffs(settings)})로 산출했습니다. 5단계(A~E) 교과라면 설정에서 바꾸세요.`,
+    })
+  } else if (threeLevelSubject) {
+    warnings.push({
+      level: 'info',
+      code: 'level-scheme-suggest-three',
+      message: `${exam.header.subject} 교과는 보통 3단계(A·B·C)로 평가합니다. 설정의 "성취수준 단계"에서 3단계로 바꿀 수 있습니다.`,
+    })
+  }
+
   const mismatched = scored.filter((s) => Math.abs(s.recomputed - s.student.neis.total) > 0.005)
   if (mismatched.length) {
     warnings.push({
@@ -116,6 +135,7 @@ export function analyze(exam: Exam, settings: Settings, opts: AnalyzeOptions = {
     mcCount: mcItemsOf(exam).length,
     crCount: crItemsOf(exam).length,
     classNos: classes.map((c) => c.classNo),
+    activeLevels: [...activeLevels(settings)],
     overview: { ...overviewBase, alphaMc: alphaMc(scored), alphaAll: alphaAll(scored) },
     byClass,
     byLevel,

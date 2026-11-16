@@ -58,35 +58,44 @@ function keySignature(a: AnswerSheetParse): string {
   return a.mcItems.map((it) => `${it.no}:${(it.key?.key ?? []).join(',')}:${it.points ?? ''}`).join(';') + `|cr${a.crItems.length}`
 }
 
-type IaCheck = { status: 'verified' | 'mismatch' | 'unverifiable'; details: string[] }
+type IaCheck = { status: 'verified' | 'mismatch' | 'unverifiable'; details: string[]; skippedMultiKey?: number[] }
+
+const round2 = (v: number) => Math.round(v * 100) / 100
 
 /** 문항분석표의 반 수치를 같은 반 정오표로 계산한 값과 대조 */
 function verifyItemAnalysis(ia: ItemAnalysisParse, mcItems: Item[], classes: ClassRoster[]): IaCheck {
   const cls = ia.classNo ? classes.find((c) => c.classNo === ia.classNo) : undefined
   if (!cls) return { status: 'unverifiable', details: [] }
-  const tryWith = (students: Student[]): string[] => {
+  // 복수정답 문항은 NEIS의 답지별 집계 방식을 확인하지 못했으므로, 그 문항만 다른 것은 불일치로 보지 않는다.
+  const multiKeyNos = new Set(mcItems.filter((i) => i.key.length > 1).map((i) => i.no))
+  const tryWith = (students: Student[]): { hard: string[]; soft: number[] } => {
     const rows = neisCountsFor(mcItems, students)
-    const diffs: string[] = []
+    const hard: string[] = []
+    const soft: number[] = []
     for (const ref of ia.items) {
       const r = rows.find((x) => x.no === ref.no)
       if (!r) {
-        diffs.push(`${ref.no}번: 정오표에 없는 문항`)
+        hard.push(`${ref.no}번: 정오표에 없는 문항`)
         continue
       }
       const ours = [1, 2, 3, 4, 5].map((k) => r.counts[k as 1])
       const theirs = [1, 2, 3, 4, 5].map((k) => ref.classCounts[k as 1])
       if (ours.join(',') !== theirs.join(',') || r.blank !== ref.classBlank || r.multi !== ref.classMulti) {
-        diffs.push(`${ref.no}번: 문항분석표 ${theirs.join('/')} · 정오표 ${ours.join('/')}`)
+        if (multiKeyNos.has(ref.no)) soft.push(ref.no)
+        else hard.push(`${ref.no}번: 문항분석표 ${theirs.join('/')} · 정오표 ${ours.join('/')}`)
       }
     }
-    if (ia.classN && ia.classN !== students.length) diffs.unshift(`학생 수: 문항분석표 ${ia.classN}명 · 정오표 ${students.length}명`)
-    return diffs
+    if (ia.classN && ia.classN !== students.length) hard.unshift(`학생 수: 문항분석표 ${ia.classN}명 · 정오표 ${students.length}명`)
+    return { hard, soft }
   }
   const all = tryWith(cls.students)
-  if (all.length === 0) return { status: 'verified', details: [] }
+  if (all.hard.length === 0) return { status: 'verified', details: [], skippedMultiKey: all.soft }
   const responded = cls.students.filter((s) => !isNoResponse(s))
-  if (responded.length !== cls.students.length && tryWith(responded).length === 0) return { status: 'verified', details: [] }
-  return { status: 'mismatch', details: all }
+  if (responded.length !== cls.students.length) {
+    const alt = tryWith(responded)
+    if (alt.hard.length === 0) return { status: 'verified', details: [], skippedMultiKey: alt.soft }
+  }
+  return { status: 'mismatch', details: all.hard }
 }
 
 /** 파싱된 파일들을 하나의 Exam 으로 합친다. 정오표가 기준이며 다른 표는 보강·검증용. */
@@ -196,8 +205,9 @@ export function buildExam(files: ParsedFile[]): BuildResult {
   if (dupIds.length) warnings.push({ level: 'warn', code: 'duplicate-student-id', message: `같은 학번이 서로 다른 반/번호에 나타납니다 (${dupIds.length}건).`, details: dupIds.slice(0, 10) })
 
   // 만점
-  const mcSum = mcItems.reduce((s, i) => s + i.points, 0)
-  const crSum = crItems.reduce((s, i) => s + i.points, 0)
+  // 소수 배점의 부동소수 오차(69.99999…)가 화면에 보이지 않도록 반올림
+  const mcSum = round2(mcItems.reduce((s, i) => s + i.points, 0))
+  const crSum = round2(crItems.reduce((s, i) => s + i.points, 0))
   const maxima = {
     mc: ref.maxima.mc ?? mcSum,
     cr: ref.maxima.cr ?? crSum,
@@ -306,7 +316,14 @@ export function buildExam(files: ParsedFile[]): BuildResult {
     const ia = chosen.ia
     gradeReference = { source: ia.fileName, header: ia.header, classNo: ia.classNo, items: ia.items, verified: chosen.check.status === 'verified' ? true : undefined }
     if (chosen.check.status === 'verified') {
-      warnings.push({ level: 'info', code: 'itemanalysis-verified', message: `문항분석표(${ia.classNo}반)의 반 수치가 ${ia.classNo}반 정오표와 ${ia.items.length}문항 모두 일치합니다. 학년 전체 ${ia.gradeN ?? '?'}명 수치를 비교에 사용합니다.` })
+      const skipped = chosen.check.skippedMultiKey ?? []
+      warnings.push({
+        level: 'info',
+        code: 'itemanalysis-verified',
+        message: skipped.length
+          ? `문항분석표(${ia.classNo}반)의 반 수치가 ${ia.classNo}반 정오표와 일치합니다(복수정답 문항 ${skipped.join(', ')}번은 집계 방식이 달라 대조에서 제외). 학년 전체 ${ia.gradeN ?? '?'}명 수치를 비교에 사용합니다.`
+          : `문항분석표(${ia.classNo}반)의 반 수치가 ${ia.classNo}반 정오표와 ${ia.items.length}문항 모두 일치합니다. 학년 전체 ${ia.gradeN ?? '?'}명 수치를 비교에 사용합니다.`,
+      })
     } else {
       warnings.push({ level: 'info', code: 'itemanalysis-unverified', message: `문항분석표${ia.classNo ? `(${ia.classNo}반)` : ''}와 같은 반의 정오표가 없어 반 수치는 대조하지 못했습니다. 학년 전체 ${ia.gradeN ?? '?'}명 수치를 비교에 사용합니다.` })
     }

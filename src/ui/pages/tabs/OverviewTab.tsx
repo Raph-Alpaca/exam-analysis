@@ -1,7 +1,9 @@
-import { LEVELS, type AnalysisResult, type Exam, type GroupStats, type Level } from '../../../model/types'
+import { useMemo } from 'react'
+import type { AnalysisResult, Exam, GroupStats, Level } from '../../../model/types'
 import { useAppStore } from '../../store/useAppStore'
 import { alphaBand } from '../../../model/thresholds'
-import { fmt1, fmt3, fmtInt } from '../../../model/format'
+import { cutoffMarks, describeCutoffs } from '../../../model/settings'
+import { describeCrPart, fmt1, fmt3, fmtInt } from '../../../model/format'
 import { BandBadge, KpiTile, LevelChip, SectionTitle } from '../../components/basic'
 import { DataTable, type Column } from '../../components/DataTable'
 import { LevelStackedBar, ScoreHistogram } from '../../charts/charts'
@@ -11,7 +13,7 @@ type LevelRow = { label: string; level?: Level; g: GroupStats; share: number | n
 export function LevelStatsTable({ result, exam, caption }: { result: AnalysisResult; exam: Exam; caption?: string }) {
   const hasCr = exam.maxima.cr > 0
   const total = result.overview.n
-  const rows: LevelRow[] = LEVELS.map((l) => ({ label: l, level: l, g: result.byLevel[l], share: total ? (100 * result.byLevel[l].n) / total : null }))
+  const rows: LevelRow[] = result.activeLevels.map((l) => ({ label: l, level: l, g: result.byLevel[l], share: total ? (100 * result.byLevel[l].n) / total : null }))
   const footer: LevelRow[] = [{ label: '전체', g: result.overview, share: 100 }]
   const cols: Column<LevelRow>[] = [
     { id: 'lv', header: '성취수준', cell: (r) => (r.level ? <LevelChip level={r.level} /> : <strong>{r.label}</strong>), align: 'center' },
@@ -35,25 +37,27 @@ export function OverviewTab({ exam, result }: { exam: Exam; result: AnalysisResu
   const settings = useAppStore((s) => s.settings)
   const o = result.overview
   const groups = [{ name: '전체', stats: o }, ...result.classNos.map((c) => ({ name: `${c}반`, stats: result.byClass[c]! }))]
+  const lowest = result.activeLevels[result.activeLevels.length - 1]!
+  const marks = useMemo(() => cutoffMarks(settings), [settings])
   return (
     <div className="stack">
       <div className="grid grid-kpi">
         <KpiTile label="응답자" value={`${fmtInt(o.n)}명`} sub={`${result.classNos.length}개 반`} />
-        <KpiTile label="문항" value={`${result.mcCount}문항`} sub={result.crCount ? `+ 서답형 ${result.crCount}문항` : '선다형'} />
+        <KpiTile label="문항" value={`${result.mcCount}문항`} sub={describeCrPart(result.crCount, exam.maxima.cr)} />
         <KpiTile label={`평균 (${exam.maxima.total}점 만점)`} value={fmt1(o.total.mean)} sub={`표준편차 ${fmt1(o.total.sd)} (${settings.sdMode === 'population' ? '모집단' : '표본'})`} />
         <KpiTile label="신뢰도 α (선다형)" value={fmt3(o.alphaMc)} sub={<BandBadge band={alphaBand(o.alphaMc)} />} />
-        <KpiTile label="성취수준 A 비율" value={`${fmt1(o.levelPct.A)}%`} sub={`E ${fmt1(o.levelPct.E)}%`} />
+        <KpiTile label="성취수준 A 비율" value={`${fmt1(o.levelPct.A)}%`} sub={`${lowest} ${fmt1(o.levelPct[lowest])}%`} />
       </div>
 
       <div className="grid grid-2">
         <section className="card">
-          <SectionTitle title="성취수준 분포">분할점수 A {settings.cutoffs.AB} / B {settings.cutoffs.BC} / C {settings.cutoffs.CD} / D {settings.cutoffs.DE} 이상</SectionTitle>
+          <SectionTitle title="성취수준 분포">분할점수 {describeCutoffs(settings)} 이상</SectionTitle>
           {/* 옆 점수 분포(280px)와 높이를 맞춘다 */}
-          <LevelStackedBar groups={groups} height={Math.max(280, 60 + groups.length * 34)} />
+          <LevelStackedBar groups={groups} levels={result.activeLevels} height={Math.max(280, 60 + groups.length * 34)} />
         </section>
         <section className="card">
           <SectionTitle title="점수 분포">100점 환산 점수의 5점 구간별 학생 수, 막대 색은 성취수준</SectionTitle>
-          <ScoreHistogram bins={result.histogram} cutoffs={settings.cutoffs} />
+          <ScoreHistogram bins={result.histogram} marks={marks} levels={result.activeLevels} />
         </section>
       </div>
 

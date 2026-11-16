@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useAppStore } from '../store/useAppStore'
-import { validateCutoffs } from '../../model/settings'
+import { validateCutoffs, validateCutoffs3 } from '../../model/settings'
 
 /** 선택지 이름과 그 아래 한 줄 설명 */
 function Opt({ label, desc }: { label: ReactNode; desc?: ReactNode }) {
@@ -17,22 +17,55 @@ export function SettingsPanel() {
   const setSettings = useAppStore((s) => s.setSettings)
   const resetSettings = useAppStore((s) => s.resetSettings)
   const exam = useAppStore((s) => s.exam)
-  const err = validateCutoffs(settings.cutoffs)
+  const three = settings.levelScheme === 'three'
+  const err = three ? validateCutoffs3(settings.cutoffs3) : validateCutoffs(settings.cutoffs)
   const cut = (k: keyof typeof settings.cutoffs) => (
     <div className="field" key={k}>
-      <label htmlFor={`cut-${k}`}>{k.replace('', '')[0]}/{k[1]} 분할점수</label>
+      <label htmlFor={`cut-${k}`}>{k[0]}/{k[1]} 분할점수</label>
       <input id={`cut-${k}`} type="number" min={0} max={100} step={0.5} value={settings.cutoffs[k]} onChange={(e) => setSettings({ cutoffs: { ...settings.cutoffs, [k]: Number(e.target.value) } })} />
+    </div>
+  )
+  const cut3 = (k: keyof typeof settings.cutoffs3) => (
+    <div className="field" key={k}>
+      <label htmlFor={`cut3-${k}`}>{k[0]}/{k[1]} 분할점수</label>
+      <input id={`cut3-${k}`} type="number" min={0} max={100} step={0.5} value={settings.cutoffs3[k]} onChange={(e) => setSettings({ cutoffs3: { ...settings.cutoffs3, [k]: Number(e.target.value) } })} />
     </div>
   )
   const hasCr = (exam?.maxima.cr ?? 0) > 0
   return (
     <div className="stack settings">
       <section className="stack-sm">
-        <h3>성취수준 분할점수 (%)</h3>
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-          {(['AB', 'BC', 'CD', 'DE'] as const).map(cut)}
+        <h3>성취수준 단계</h3>
+        <div className="radio-group">
+          <label>
+            <input type="radio" name="scheme" checked={!three} onChange={() => setSettings({ levelScheme: 'five' })} />
+            <Opt label="5단계 (A~E)" desc="국어·수학·영어·사회·과학 등 대부분의 교과" />
+          </label>
+          <label>
+            <input type="radio" name="scheme" checked={three} onChange={() => setSettings({ levelScheme: 'three' })} />
+            <Opt label="3단계 (A·B·C)" desc="체육·음악·미술" />
+          </label>
         </div>
-        {err ? <div className="small" style={{ color: 'var(--danger)' }}>{err}</div> : <div className="hint small muted">분할점수 이상이면 해당 수준입니다. 기본값 90/80/70/60 (고정 분할점수). 추정 분할점수를 쓰는 과목은 값을 바꾸세요.</div>}
+      </section>
+
+      <section className="stack-sm">
+        <h3>성취수준 분할점수 (%)</h3>
+        {three ? (
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+            {(['AB', 'BC'] as const).map(cut3)}
+          </div>
+        ) : (
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+            {(['AB', 'BC', 'CD', 'DE'] as const).map(cut)}
+          </div>
+        )}
+        {err ? (
+          <div className="small" style={{ color: 'var(--danger)' }}>{err}</div>
+        ) : (
+          <div className="hint small muted">
+            분할점수 이상이면 해당 수준입니다. {three ? '기본값 80/60.' : '기본값 90/80/70/60 (고정 분할점수). 추정 분할점수를 쓰는 과목은 값을 바꾸세요.'}
+          </div>
+        )}
       </section>
 
       <section className="stack-sm">

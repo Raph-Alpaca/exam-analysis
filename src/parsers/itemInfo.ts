@@ -2,6 +2,7 @@ import type { CellGrid } from '../xlsx/readWorkbook'
 import type { Difficulty, ExamHeader, Item, Standard, Warning } from '../model/types'
 import { decodeKey } from './legend'
 import { ParseError } from './errors'
+import { parseItemNo, RE_CR_MAX, RE_CR_SECTION, RE_MC_MAX, RE_MC_SECTION } from './terms'
 
 export interface ItemInfoParse {
   fileName: string
@@ -81,14 +82,18 @@ export function parseItemInfo(grid: CellGrid, fileName: string): ItemInfoParse {
   const warnings: Warning[] = []
   const header: ExamHeader = { raw: '' }
   for (let r = 1; r <= Math.min(grid.rows, 8); r++) {
-    const line = grid.rowTexts(r).filter((x) => x !== '').join('  ')
+    const cells = grid.rowTexts(r).filter((x) => x !== '')
+    const line = cells.join('  ')
     const subj = /\(\s*(.+?)\s*\)\s*과목/.exec(line)
     if (subj && !header.subject) header.subject = subj[1]
-    const ym = /(\d{4})\s*년도\s*(\d)\s*학기\s*(\S+)/.exec(line)
-    if (ym && !header.year) {
-      header.year = ym[1]
-      header.semester = ym[2]
-      header.examName = ym[3]
+    // 고사명은 한 칸 안에서 끝까지 읽는다 ("제1회 지필고사"처럼 띄어 쓴 이름)
+    for (const cell of cells) {
+      const ym = /(\d{4})\s*년도\s*(\d)\s*학기\s*(.+?)\s*$/.exec(cell.replace(/\s+/g, ' '))
+      if (ym && !header.year) {
+        header.year = ym[1]
+        header.semester = ym[2]
+        header.examName = ym[3]
+      }
     }
     const gr = /(\d)\s*학년/.exec(line)
     if (gr && !header.grade) header.grade = gr[1]
@@ -99,9 +104,9 @@ export function parseItemInfo(grid: CellGrid, fileName: string): ItemInfoParse {
     const line = grid.rowTexts(r).join(' ')
     const t = /총점\s*([\d.]+)\s*점/.exec(line)
     if (t) maxima.total = Number(t[1])
-    const m = /선택형\s*([\d.]+)\s*점/.exec(line)
+    const m = RE_MC_MAX.exec(line)
     if (m) maxima.mc = Number(m[1])
-    const c = /서답형\s*([\d.]+)\s*점/.exec(line)
+    const c = RE_CR_MAX.exec(line)
     if (c) maxima.cr = Number(c[1])
   }
 
@@ -145,13 +150,13 @@ export function parseItemInfo(grid: CellGrid, fileName: string): ItemInfoParse {
       continue
     }
     const first = texts.find((t) => t !== '') ?? ''
-    if (/^서답형\s*문항|^서술형\s*문항|^논술형\s*문항/.test(first)) {
+    if (RE_CR_SECTION.test(first)) {
       kind = 'cr'
       afterTotal = false
       r++
       continue
     }
-    if (/^선택형\s*문항|^선다형\s*문항/.test(first)) {
+    if (RE_MC_SECTION.test(first)) {
       kind = 'mc'
       afterTotal = false
       r++
@@ -167,22 +172,32 @@ export function parseItemInfo(grid: CellGrid, fileName: string): ItemInfoParse {
       r++
       continue
     }
-    const no = grid.int(r, cols.noCol)
-    if (no != null) {
+    // 문항번호 칸: "3", "서답1", "서술형 2" … 이름에 서답형 낱말이 있으면 구역과 무관하게 서답형
+    const noText = grid.text(r, cols.noCol)
+    const rowPoints = cols.pointsCol ? grid.num(r, cols.pointsCol) : null
+    let parsedNo = parseItemNo(noText)
+    if (!parsedNo && noText !== '' && rowPoints != null && rowPoints > 0 && kind === 'cr') {
+      // "1-(2)" 같은 하위 문항: 서답형 구역에서 배점이 있으면 순번을 매겨 문항으로 읽는다
+      parsedNo = { no: items.filter((i) => i.kind === 'cr').length + 1, cr: true }
+    }
+    if (parsedNo) {
+      const no = parsedNo.no
+      const rowKind: 'mc' | 'cr' = parsedNo.cr ? 'cr' : kind
+      const rowLabel = rowKind === 'mc' ? String(no) : /^\d+$/.test(noText) ? `서답${no}` : noText.replace(/\s+/g, ' ')
       let difficulty: Difficulty | undefined
       for (const [c, d] of cols.diffCols) {
         const t = grid.text(r, c).replace(/\s+/g, '')
         if (t && !NOT_A_MARK.has(t)) difficulty = d
       }
       if (!difficulty && cols.diffTextCol) difficulty = diffFromText(grid.text(r, cols.diffTextCol))
-      const points = cols.pointsCol ? grid.num(r, cols.pointsCol) : null
+      const points = rowPoints
       const keyText = cols.keyCol ? grid.text(r, cols.keyCol) : ''
-      const key = kind === 'mc' ? decodeKey(keyText) : null
-      if (kind === 'mc' && !key) warnings.push({ level: 'warn', code: 'iteminfo-no-key', message: `${fileName}: ${no}번 문항의 정답("${keyText}")을 읽지 못했습니다.` })
+      const key = rowKind === 'mc' ? decodeKey(keyText) : null
+      if (rowKind === 'mc' && !key) warnings.push({ level: 'warn', code: 'iteminfo-no-key', message: `${fileName}: ${no}번 문항의 정답("${keyText.slice(0, 30)}")을 읽지 못했습니다.` })
       items.push({
         no,
-        kind,
-        label: kind === 'mc' ? String(no) : `서답${no}`,
+        kind: rowKind,
+        label: rowLabel,
         points: points ?? 0,
         key: key?.key ?? [],
         keyMode: key?.keyMode ?? 'single',
@@ -195,7 +210,15 @@ export function parseItemInfo(grid: CellGrid, fileName: string): ItemInfoParse {
       r++
       continue
     }
-    // 고아 행: 직전 문항의 성취기준(또는 내용영역) 이어쓰기
+    // 문항번호 칸에 글자가 있거나 배점이 있는 행은 이어쓰기가 아니다. 문항처럼 보이는데 못 읽었으면 알린다.
+    if (noText !== '' || rowPoints != null) {
+      if (rowPoints != null && rowPoints > 0) {
+        warnings.push({ level: 'warn', code: 'iteminfo-row-skipped', message: `${fileName}: 문항번호 "${noText.slice(0, 20)}"(배점 ${rowPoints}) 행을 문항으로 읽지 못해 건너뛰었습니다.` })
+      }
+      r++
+      continue
+    }
+    // 고아 행(문항번호·배점이 모두 빈 행): 직전 문항의 성취기준(또는 내용영역) 이어쓰기
     if (lastIdx >= 0) {
       const cont = cols.stdCol ? grid.text(r, cols.stdCol) : ''
       if (cont) stdText.set(lastIdx, (stdText.get(lastIdx) ?? '') + cont)

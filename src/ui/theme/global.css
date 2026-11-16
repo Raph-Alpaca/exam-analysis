@@ -397,6 +397,12 @@ input[type='radio'] {
   line-height: 1.6;
   white-space: nowrap;
 }
+/* 긴 글(내용영역 등)이 들어가는 배지: 줄바꿈 허용 */
+.badge-wrap {
+  white-space: normal;
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
 .badge::before {
   content: '';
   width: 6px;
@@ -1305,4 +1311,26 @@ details.help summary {
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* ---------- 사용 안내 ---------- */
+.guide-page h1 {
+  margin: 0 0 6px;
+}
+.guide-page .card h2 {
+  margin: 0 0 10px;
+  font-size: 1.1rem;
+}
+.guide-page .card ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
+}
+.guide-page .card li + li {
+  margin-top: 6px;
+}
+.guide-page table.data th,
+.guide-page table.data td {
+  white-space: normal;
+  vertical-align: top;
+  text-align: left;
 }

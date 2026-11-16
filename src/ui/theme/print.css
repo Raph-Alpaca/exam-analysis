@@ -64,6 +64,17 @@
     padding: 3px 5px;
     border-bottom: 1px solid #ccc;
   }
+  /* 머리칸은 줄을 바꿔 폭을 줄이고, 열이 많은 표(14열 이상)는 글자를 줄여 A4 폭 안에 넣는다 */
+  table.data th {
+    white-space: normal;
+  }
+  table.data:has(tbody tr:first-child > :nth-child(14)) {
+    font-size: 7pt;
+  }
+  table.data:has(tbody tr:first-child > :nth-child(14)) th,
+  table.data:has(tbody tr:first-child > :nth-child(14)) td {
+    padding: 2px 3px;
+  }
   .student-compact table.data th,
   .student-compact table.data td {
     padding: 1.5px 4px;
@@ -167,6 +178,14 @@
 }
 .print-view table.data th {
   position: static;
+  white-space: normal;
+}
+.print-view table.data:has(tbody tr:first-child > :nth-child(14)) {
+  font-size: 0.72rem;
+}
+.print-view table.data:has(tbody tr:first-child > :nth-child(14)) th,
+.print-view table.data:has(tbody tr:first-child > :nth-child(14)) td {
+  padding: 2px 3px;
 }
 .print-toolbar {
   position: sticky;
