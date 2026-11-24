@@ -223,12 +223,12 @@ export async function buildWorkbook(exam: Exam, result: AnalysisResult, settings
       ws,
       r,
       {
-        columns: [{ header: '구분', width: 10 }, { header: '학생 수', width: 8 }, { header: '평균', width: 8, fmt: '0.0' }, { header: '표준편차', width: 8, fmt: '0.0' }, ...result.activeLevels.map((l) => ({ header: l, group: '성취수준별 비율(%)', width: 7, fmt: '0.0' })), ...result.activeLevels.map((l) => ({ header: l, group: '성취수준별 학생 수', width: 7 }))],
+        columns: [{ header: '구분', width: 10 }, { header: '학생 수', width: 8 }, { header: '평균', width: 8, fmt: '0.0' }, { header: '표준편차', width: 8, fmt: '0.0' }, { header: '최고점', width: 8 }, { header: '최저점', width: 8 }, ...result.activeLevels.map((l) => ({ header: l, group: '성취수준별 비율(%)', width: 7, fmt: '0.0' })), ...result.activeLevels.map((l) => ({ header: l, group: '성취수준별 학생 수', width: 7 }))],
         rows: [
-          ['전체', o.n, fmtOrNull(o.total.mean), fmtOrNull(o.total.sd), ...result.activeLevels.map((l) => fmtOrNull(o.levelPct[l])), ...result.activeLevels.map((l) => o.levelCounts[l])],
+          ['전체', o.n, fmtOrNull(o.total.mean), fmtOrNull(o.total.sd), fmtOrNull(o.totalMax), fmtOrNull(o.totalMin), ...result.activeLevels.map((l) => fmtOrNull(o.levelPct[l])), ...result.activeLevels.map((l) => o.levelCounts[l])],
           ...result.classNos.map((c) => {
             const x = result.byClass[c]!
-            return [`${c}반`, x.n, fmtOrNull(x.total.mean), fmtOrNull(x.total.sd), ...result.activeLevels.map((l) => fmtOrNull(x.levelPct[l])), ...result.activeLevels.map((l) => x.levelCounts[l])]
+            return [`${c}반`, x.n, fmtOrNull(x.total.mean), fmtOrNull(x.total.sd), fmtOrNull(x.totalMax), fmtOrNull(x.totalMin), ...result.activeLevels.map((l) => fmtOrNull(x.levelPct[l])), ...result.activeLevels.map((l) => x.levelCounts[l])]
           }),
         ],
         totalRowIdx: [0],

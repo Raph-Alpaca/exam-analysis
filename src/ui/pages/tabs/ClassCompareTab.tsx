@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { CHOICES, type AnalysisResult, type Exam, type GroupStats } from '../../../model/types'
 import { useAppStore } from '../../store/useAppStore'
 import { useFullAnalysis } from '../../store/useAnalysis'
-import { fmt1, fmtInt } from '../../../model/format'
+import { fmt1, fmtInt, fmtPoints } from '../../../model/format'
 import { heatStyle } from '../../theme/levels'
 import { HeatLegend, LevelChip, SectionTitle } from '../../components/basic'
 import { DataTable, type Column } from '../../components/DataTable'
@@ -19,6 +19,8 @@ export function ClassStatsTable({ result, caption }: { result: AnalysisResult; c
     { id: 'n', header: '학생 수', accessor: (r) => r.g.n, cell: (r) => fmtInt(r.g.n), sortable: true },
     { id: 'mean', header: '평균', accessor: (r) => r.g.total.mean, cell: (r) => fmt1(r.g.total.mean), sortable: true },
     { id: 'sd', header: '표준편차', accessor: (r) => r.g.total.sd, cell: (r) => fmt1(r.g.total.sd), sortable: true },
+    { id: 'max', header: '최고점', accessor: (r) => r.g.totalMax, cell: (r) => fmtPoints(r.g.totalMax), sortable: true },
+    { id: 'min', header: '최저점', accessor: (r) => r.g.totalMin, cell: (r) => fmtPoints(r.g.totalMin), sortable: true },
     ...result.activeLevels.map(
       (l): Column<ClassRow> => ({
         id: `l${l}`,

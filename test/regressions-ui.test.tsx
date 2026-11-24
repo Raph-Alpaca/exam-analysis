@@ -483,6 +483,29 @@ describe('개요 화면', () => {
     expect(tiles['최저점']).toBe(String(Math.min(...totals)))
   })
 
+  it('학급별 성취도 표에 반마다(그리고 전체) 최고점·최저점이 나온다 — 화면과 인쇄 보고서 모두', async () => {
+    await loadExam()
+    const classes = useAppStore.getState().exam!.classes
+    for (const el of [<ResultsPage key="r" tab="classes" />, <PrintReportPage key="p" />]) {
+      const c = await render(el)
+      // 맨 아래 머리글 행에 모든 열 이름이 순서대로 있다
+      const table = [...c.querySelectorAll('table.data')].find((t) => [...t.querySelectorAll('thead tr:last-child th')].some((th) => th.textContent === '학급'))!
+      const heads = [...table.querySelectorAll('thead tr:last-child th')].map((th) => th.textContent)
+      expect(heads.slice(0, 6)).toEqual(['학급', '학생 수', '평균', '표준편차', '최고점', '최저점'])
+      const cell = (label: string, name: string) => [...table.querySelectorAll('tbody tr')].find((tr) => tr.children[0]!.textContent === label)!.children[heads.indexOf(name)]!.textContent
+      for (const cl of classes) {
+        const totals = cl.students.map((s) => s.neis.total)
+        expect(cell(`${cl.classNo}반`, '최고점')).toBe(String(Math.max(...totals)))
+        expect(cell(`${cl.classNo}반`, '최저점')).toBe(String(Math.min(...totals)))
+      }
+      const all = classes.flatMap((cl) => cl.students.map((s) => s.neis.total))
+      expect(cell('전체', '최고점')).toBe(String(Math.max(...all)))
+      expect(cell('전체', '최저점')).toBe(String(Math.min(...all)))
+      act(() => root?.unmount())
+      c.remove()
+    }
+  })
+
   it('인쇄 보고서의 요약에도 최고점과 최저점이 나온다 (학급 필터를 걸면 고른 반의 값)', async () => {
     await loadExam()
     const classes = useAppStore.getState().exam!.classes

@@ -312,4 +312,30 @@ describe('최고점·최저점', () => {
       expect(typeof cell('최고점')).toBe('number')
     }
   })
+
+  it('엑셀의 "학급별 성취도" 표에 반마다(그리고 전체) 최고점·최저점이 들어간다', async () => {
+    const { exam } = buildExam(await examWithCrColumn())
+    const result = analyze(exam!, DEFAULT_SETTINGS)
+    const wb = await buildWorkbook(exam!, result, DEFAULT_SETTINGS)
+    const read = XLSX.read(await wb.xlsx.writeBuffer(), { type: 'array' })
+    const rows = XLSX.utils.sheet_to_json<Row>(read.Sheets['성취도분석']!, { header: 1 })
+    const cap = rows.findIndex((r) => r[0] === '학급별 성취도')
+    const hdr = rows[cap + 1]! // 2단 머리글의 윗줄 (묶음이 없는 열은 여기에 이름이 있다)
+    expect(hdr.slice(0, 6)).toEqual(['구분', '학생 수', '평균', '표준편차', '최고점', '최저점'])
+    const data = rows.slice(cap + 3)
+    const cell = (label: string, name: string) => data.find((r) => r[0] === label)![hdr.indexOf(name)]
+    expect(cell('전체', '최고점')).toBe(result.overview.totalMax)
+    expect(cell('전체', '최저점')).toBe(result.overview.totalMin)
+    expect(result.classNos).toEqual(['1', '2'])
+    for (const c of result.classNos) {
+      expect(cell(`${c}반`, '최고점')).toBe(result.byClass[c]!.totalMax)
+      expect(cell(`${c}반`, '최저점')).toBe(result.byClass[c]!.totalMin)
+    }
+    // 뒤에 오는 성취수준별 비율 열이 밀리지 않고 제 값을 가리키는지
+    const second = rows[cap + 2]!
+    const firstLevelCol = second.indexOf('A')
+    expect(firstLevelCol).toBe(6)
+    expect(cell('전체', '최저점')).not.toBe(data.find((r) => r[0] === '전체')![firstLevelCol])
+    expect(data.find((r) => r[0] === '전체')![firstLevelCol]).toBeCloseTo(result.overview.levelPct.A, 6)
+  })
 })
