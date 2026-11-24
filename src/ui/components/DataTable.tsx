@@ -105,20 +105,34 @@ export function DataTable<T>({ columns, rows, rowKey, caption, onRowClick, selec
             </tr>
           )}
           <tr>
-            {columns.map((c) => (
-              <th
-                key={c.id}
-                scope="col"
-                className={c.sortable && c.accessor ? 'sortable' : undefined}
-                style={c.width != null ? { width: c.width, minWidth: c.width } : undefined}
-                onClick={() => toggleSort(c)}
-                aria-sort={sort?.id === c.id ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
-                title={c.headerTitle}
-              >
-                {c.header}
-                {sort?.id === c.id && <span className="sort-ind">{sort.dir === 'asc' ? '▲' : '▼'}</span>}
-              </th>
-            ))}
+            {columns.map((c) => {
+              const sortable = !!(c.sortable && c.accessor)
+              return (
+                <th
+                  key={c.id}
+                  scope="col"
+                  className={sortable ? 'sortable' : undefined}
+                  style={c.width != null ? { width: c.width, minWidth: c.width } : undefined}
+                  onClick={() => toggleSort(c)}
+                  aria-sort={sort?.id === c.id ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
+                  title={c.headerTitle}
+                >
+                  {sortable ? (
+                    // 키보드로도 정렬할 수 있게 단추로 둔다. 누르면 click 이 머리칸으로 올라가 한 번만 바뀐다.
+                    <button type="button" className="th-sort">
+                      {c.header}
+                      {sort?.id === c.id && (
+                        <span className="sort-ind" aria-hidden="true">
+                          {sort.dir === 'asc' ? '▲' : '▼'}
+                        </span>
+                      )}
+                    </button>
+                  ) : (
+                    c.header
+                  )}
+                </th>
+              )
+            })}
           </tr>
         </thead>
         <tbody>

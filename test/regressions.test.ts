@@ -13,6 +13,10 @@ import { parseItemAnalysis } from '../src/parsers/itemAnalysis'
 import { buildExam, parseGrids, type ParsedFile } from '../src/parsers/index'
 import { analyze } from '../src/stats/analyze'
 import { DEFAULT_SETTINGS } from '../src/model/settings'
+import { alphaBand, discBand, shownValue } from '../src/model/thresholds'
+import { fmt1, fmt2, fmt3 } from '../src/model/format'
+import { computeFlags } from '../src/stats/flags'
+import type { ItemStats } from '../src/model/types'
 import { buildWorkbook } from '../src/export/excel'
 
 type Row = (string | number | null)[]
@@ -174,5 +178,122 @@ describe('정답 칸을 읽지 못한 문항', () => {
     expect(first.mcScore).toBe(fx.students[0]!.mc)
     const w = parsed.warnings.find((x) => x.code === 'item-no-key')!
     expect(w.message).not.toContain('제외')
+  })
+})
+
+describe('한 파일에 시트가 여러 개일 때', () => {
+  function workbook(sheets: [string, Aoa][]): ArrayBuffer {
+    const wb = XLSX.utils.book_new()
+    for (const [name, aoa] of sheets) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa as Row[]), name)
+    return XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
+  }
+  const sheet = (c: number) => makeAnswerSheet({ classNo: c, nItems: N, nStudents: 6, style: '_2', seed: 20 + c, keys: KEYS, points: POINTS }).aoa
+
+  it('읽지 않은 시트가 있으면 어느 시트인지와 어떻게 올려야 하는지 알린다', async () => {
+    const grids = await readWorkbookData(workbook([['1반', sheet(1)], ['2반', sheet(2)], ['3반', sheet(3)]]), '정오표모음.xlsx')
+    const parsed = parseGrids(grids, '정오표모음.xlsx')
+    expect(parsed.answers!.classNos).toEqual(['1'])
+    const w = parsed.answers!.warnings.find((x) => x.code === 'other-sheets-ignored')!
+    expect(w.level).toBe('warn')
+    expect(w.message).toContain('"1반" 시트만 읽었')
+    expect(w.message).toContain('"2반", "3반"')
+    expect(w.message).toContain('따로 파일로 저장')
+  })
+
+  it('빈 시트나 관계없는 시트만 더 있을 때는 알리지 않는다', async () => {
+    const grids = await readWorkbookData(workbook([['Sheet1', sheet(1)], ['Sheet2', [[]]], ['메모', [['참고'], ['수업 시간표']]]]), 'c1.xlsx')
+    const parsed = parseGrids(grids, 'c1.xlsx')
+    expect(parsed.error).toBeUndefined()
+    expect(parsed.answers!.warnings.some((x) => x.code === 'other-sheets-ignored')).toBe(false)
+  })
+})
+
+describe('학급 필터를 건 채 엑셀로 내보낼 때', () => {
+  it('문항분석표_재구성 시트에도 고른 반만 나온다', async () => {
+    const { exam } = buildExam(await examWithCrColumn())
+    const result = analyze(exam!, DEFAULT_SETTINGS, { classFilter: ['2'] })
+    const wb = await buildWorkbook(exam!, result, DEFAULT_SETTINGS)
+    const read = XLSX.read(await wb.xlsx.writeBuffer(), { type: 'array' })
+    const captions = XLSX.utils
+      .sheet_to_json<Row>(read.Sheets['문항분석표_재구성']!, { header: 1 })
+      .map((r) => r[0])
+      .filter((v): v is string => typeof v === 'string' && /^\d+반 \(\d+명\)$/.test(v))
+    expect(captions.map((c) => c.split(' ')[0])).toEqual(['2반'])
+  })
+})
+
+describe('판정은 화면에 보이는 값으로 한다', () => {
+  const item = (disc: number): Omit<ItemStats, 'flags'> => ({ no: 1, key: [1], points: 4, n: 100, p: 60, disc, counts: { 1: 60, 2: 10, 3: 10, 4: 10, 5: 10, none: 0 }, pct: { 1: 60, 2: 10, 3: 10, 4: 10, 5: 10, none: 0 }, blank: 0, multi: 0, invalid: 0, observed3: '보통', observed5: '쉬움' })
+  const codes = (disc: number) => computeFlags(item(disc)).map((f) => f.code)
+
+  it('변별도: 0.20으로 보이는 0.1996은 ".20 미만"이 아니다', () => {
+    expect(discBand(0.1996)?.label).toBe('낮음') // 0.20 → .20 이상 .30 미만
+    expect(discBand(0.1949)?.label).toBe('매우 낮음') // 0.19
+    expect(discBand(0.3951)?.label).toBe('높음') // 0.40
+    expect(discBand(0.0951)?.label).toBe('매우 낮음') // 0.10
+    expect(codes(0.1996)).not.toContain('low-disc')
+    expect(codes(0.1949)).toContain('low-disc')
+    // -0.00 으로 보이는 값은 음수로 치지 않는다
+    expect(codes(-0.004)).toEqual(expect.arrayContaining(['low-disc']))
+    expect(codes(-0.004)).not.toContain('neg-disc')
+    expect(codes(-0.006)).toContain('neg-disc')
+  })
+
+  it('신뢰도: 0.700으로 보이는 0.69996은 "수용 가능"이다', () => {
+    expect(alphaBand(0.69996)?.label).toBe('수용 가능')
+    expect(alphaBand(0.6994)?.label).toBe('의심스러움') // 0.699
+    expect(alphaBand(0.89951)?.label).toBe('매우 높음') // 0.900
+  })
+
+  it('판정에 쓰는 값은 화면에 찍히는 값과 정확히 같다 (0.295 는 "0.30"으로 보이므로 .30)', () => {
+    for (const v of [0.295, 0.195, 0.095, 0.395, 0.1996, 0.2949999, 0.005, 0.015, 0.4995, 0.7995, 0.8995, -0.004, -0.295]) {
+      expect(shownValue(v, 2), `${v} 둘째 자리`).toBe(Number(fmt2(v)))
+      expect(shownValue(v, 3), `${v} 셋째 자리`).toBe(Number(fmt3(v)))
+    }
+    expect(fmt2(0.295)).toBe('0.30')
+    expect(discBand(0.295)?.label).toBe('있음')
+    expect(fmt3(0.7995)).toBe('0.800')
+    expect(alphaBand(0.7995)?.label).toBe('높음')
+  })
+
+  it('0으로 보이는 아주 작은 음수는 "-0.00"이 아니라 "0.00"으로 적는다', () => {
+    expect(fmt2(-1.9e-17)).toBe('0.00') // 계산 오차로 생기는 값
+    expect(fmt2(-0.004)).toBe('0.00')
+    expect(fmt2(-0.006)).toBe('-0.01')
+    expect(fmt3(-0.0004)).toBe('0.000')
+    expect(fmt1(-0.04)).toBe('0.0')
+    expect(fmt1(-0.06)).toBe('-0.1')
+    expect(fmt2(0.004)).toBe('0.00')
+    expect(fmt2(null)).toBe('-')
+  })
+
+  it('경계에서 떨어진 값의 판정은 그대로다', () => {
+    expect([0.05, 0.15, 0.25, 0.35, 0.45, -0.3].map((d) => discBand(d)?.label)).toEqual(['변별력 없음', '매우 낮음', '낮음', '있음', '높음', '변별력 없음'])
+    expect([0.45, 0.55, 0.65, 0.75, 0.85, 0.95].map((a) => alphaBand(a)?.label)).toEqual(['수용 불가', '낮음', '의심스러움', '수용 가능', '높음', '매우 높음'])
+    expect(discBand(null)).toBeNull()
+    expect(alphaBand(null)).toBeNull()
+  })
+})
+
+describe('최고점·최저점', () => {
+  it('분석에 포함된 학생의 총점 중 가장 높은 값과 낮은 값을 전체·학급별로 구한다', async () => {
+    // 1반 첫 학생은 결시(분석에서 빠짐) — 최저점에 0점으로 섞이면 안 된다
+    const fx = [1, 2].map((c) => makeAnswerSheet({ classNo: c, nItems: N, nStudents: 9, style: '_2', seed: 70 + c, keys: KEYS, points: POINTS, absent: c === 1 ? [0] : [] }))
+    const files: ParsedFile[] = []
+    for (const [i, f] of fx.entries()) files.push({ fileName: `c${i + 1}.xlsx`, kind: 'answers', answers: parseAnswerSheet(await gridFromAoa(f.aoa), `c${i + 1}.xlsx`) })
+    const { exam } = buildExam(files)
+    const r = analyze(exam!, DEFAULT_SETTINGS)
+    const totals = (f: (typeof fx)[number], skip: number[] = []) => f.students.filter((_, i) => !skip.includes(i)).map((s) => s.total)
+    const all = [...totals(fx[0]!, [0]), ...totals(fx[1]!)]
+    expect(r.overview.totalMax).toBe(Math.max(...all))
+    expect(r.overview.totalMin).toBe(Math.min(...all))
+    expect(r.overview.totalMin).toBeGreaterThan(0)
+    expect(r.byClass['2']!.totalMax).toBe(Math.max(...totals(fx[1]!)))
+    expect(r.byClass['2']!.totalMin).toBe(Math.min(...totals(fx[1]!)))
+    // 학생이 없는 집단은 값이 없다
+    const none = analyze(exam!, DEFAULT_SETTINGS, { classFilter: ['9'] })
+    expect(none.overview.n).toBe(0)
+    expect(none.overview.totalMax).toBeNull()
+    expect(none.overview.totalMin).toBeNull()
   })
 })

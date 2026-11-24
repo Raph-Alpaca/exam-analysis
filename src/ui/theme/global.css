@@ -653,6 +653,22 @@ table.data th .sort-ind {
   color: var(--focus);
   font-size: 0.7rem;
 }
+/* 정렬 단추: 머리칸 글자와 똑같이 보이고, 키보드로 왔을 때만 테두리를 보인다 */
+table.data th .th-sort {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  white-space: inherit;
+  cursor: pointer;
+}
+table.data th .th-sort:focus-visible {
+  outline-offset: 3px;
+}
 table.data td.num {
   text-align: right;
 }
@@ -853,6 +869,10 @@ table.data.compact td.dense {
 }
 .drawer-wide {
   width: min(780px, 100vw);
+}
+/* 열릴 때 서랍 자체가 포커스를 받는다. 창 전체에 테두리를 두르지는 않는다(안의 단추에는 그대로 보임). */
+.drawer:focus {
+  outline: none;
 }
 .drawer-head {
   position: sticky;

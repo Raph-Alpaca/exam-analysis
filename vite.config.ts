@@ -8,7 +8,12 @@ export default defineConfig({
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
-  build: { target: 'es2022' },
+  build: {
+    target: 'es2022',
+    // 작은 글꼴 조각을 CSS 안에 data: 주소로 끼워 넣지 않는다.
+    // 보안 헤더(public/_headers)가 글꼴을 같은 출처의 파일로만 허용하므로, 끼워 넣으면 그 조각이 막힌다.
+    assetsInlineLimit: 0,
+  },
   test: {
     environment: 'node',
     include: ['test/**/*.test.ts', 'test/**/*.test.tsx'],

@@ -1,6 +1,6 @@
 import { CHOICES, type AnalysisResult, type Exam, type ItemStats } from '../../../model/types'
 import { useAppStore } from '../../store/useAppStore'
-import { alphaBand, discBand } from '../../../model/thresholds'
+import { alphaBand, discBand, DISC_DIGITS, shownValue, THRESHOLDS } from '../../../model/thresholds'
 import { fmt1, fmt2, fmt3, fmtPoints } from '../../../model/format'
 import { pShadeClass } from '../../theme/levels'
 import { Badge, BandBadge, InlineBar, KpiTile, SectionTitle } from '../../components/basic'
@@ -99,7 +99,7 @@ export function ItemAnalysisTab({ exam, result }: { exam: Exam; result: Analysis
   const setUi = useAppStore((s) => s.setUi)
   const flagged = result.items.filter((i) => i.flags.some((f) => f.severity !== 'info'))
   const meanP = result.items.length ? result.items.reduce((a, i) => a + (i.p ?? 0), 0) / result.items.length : null
-  const lowDisc = result.items.filter((i) => i.disc != null && i.disc < 0.2).length
+  const lowDisc = result.items.filter((i) => i.disc != null && shownValue(i.disc, DISC_DIGITS) < THRESHOLDS.lowDisc).length
   return (
     <div className="stack">
       <div className="grid grid-kpi">

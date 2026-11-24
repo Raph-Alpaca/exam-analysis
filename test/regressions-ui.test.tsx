@@ -4,7 +4,7 @@
  * 모든 데이터는 합성(학생01…)이다.
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, type ReactElement } from 'react'
+import { act, useState, type ReactElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { aoaToXlsxBuffer, gridFromAoa } from './helpers.ts'
 import { makeAnswerSheet } from './fixtures/neis.ts'
@@ -21,6 +21,7 @@ import { PrintReportPage } from '../src/ui/pages/PrintReportPage'
 import { SettingsPanel } from '../src/ui/pages/SettingsPanel'
 import { DataTable, type Column } from '../src/ui/components/DataTable'
 import { InlineBar } from '../src/ui/components/basic'
+import { Drawer } from '../src/ui/components/Drawer'
 
 vi.mock('../src/ui/store/demo', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/ui/store/demo')>()
@@ -226,19 +227,277 @@ describe('결과 화면의 탭', () => {
   })
 })
 
+describe('키보드로 표 정렬', () => {
+  it('정렬할 수 있는 머리칸에는 단추가 있어 키보드로 누를 수 있고, 한 번 누르면 한 번만 바뀐다', async () => {
+    type R = { k: string; v: number; memo: string }
+    const cols: Column<R>[] = [
+      { id: 'v', header: '값', accessor: (r) => r.v, sortable: true },
+      { id: 'memo', header: '메모', accessor: (r) => r.memo },
+    ]
+    const rows: R[] = [
+      { k: 'a', v: 1, memo: 'x' },
+      { k: 'b', v: 3, memo: 'y' },
+      { k: 'c', v: 2, memo: 'z' },
+    ]
+    const c = await render(<DataTable columns={cols} rows={rows} rowKey={(r) => r.k} />)
+    const [thV, thMemo] = [...c.querySelectorAll('thead th')]
+    const btn = thV!.querySelector('button')!
+    expect(btn).not.toBeNull()
+    expect(btn.getAttribute('type')).toBe('button')
+    expect(btn.textContent).toContain('값')
+    expect(thMemo!.querySelector('button')).toBeNull() // 정렬 못 하는 열은 그대로 글자
+    const firstCol = () => [...c.querySelectorAll('tbody tr')].map((tr) => tr.querySelector('td')!.textContent)
+    // 단추에서 Enter·Space 를 누르면 브라우저가 click 을 낸다
+    act(() => btn.click())
+    expect(thV!.getAttribute('aria-sort')).toBe('descending')
+    expect(firstCol()).toEqual(['3', '2', '1'])
+    act(() => btn.click())
+    expect(thV!.getAttribute('aria-sort')).toBe('ascending')
+    // 머리칸의 빈 곳을 마우스로 눌러도 지금처럼 정렬된다
+    act(() => {
+      thV!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(thV!.getAttribute('aria-sort')).toBeNull()
+    expect(firstCol()).toEqual(['1', '3', '2'])
+  })
+})
+
+describe('서랍(옆에서 나오는 창)', () => {
+  function Harness({ second }: { second?: boolean }) {
+    const [open, setOpen] = useState(false)
+    const [open2, setOpen2] = useState(false)
+    return (
+      <div>
+        <button id="opener" type="button" onClick={() => setOpen(true)}>
+          열기
+        </button>
+        <Drawer open={open} onClose={() => setOpen(false)} title="첫째 창">
+          <button id="in1" type="button">
+            안쪽 단추
+          </button>
+          <input id="in2" aria-label="입력" />
+          {second && (
+            <button id="open2" type="button" onClick={() => setOpen2(true)}>
+              둘째 열기
+            </button>
+          )}
+        </Drawer>
+        <Drawer open={open2} onClose={() => setOpen2(false)} title="둘째 창">
+          <button id="in3" type="button">
+            둘째 안쪽
+          </button>
+        </Drawer>
+      </div>
+    )
+  }
+  const press = (key: string, shiftKey = false) =>
+    act(() => {
+      document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true }))
+    })
+  const closeButton = (dialog: Element) => [...dialog.querySelectorAll('button')].find((b) => /닫기/.test(b.textContent ?? ''))!
+
+  it('열리면 포커스가 안으로 들어가고, Tab 이 안에서 돌고, 닫히면 열기 전 자리로 돌아온다', async () => {
+    const c = await render(<Harness />)
+    const opener = c.querySelector<HTMLButtonElement>('#opener')!
+    opener.focus()
+    act(() => opener.click())
+    const drawer = c.querySelector<HTMLElement>('[role=dialog]')!
+    expect(drawer.contains(document.activeElement)).toBe(true)
+    expect(drawer.getAttribute('aria-labelledby')).toBe(drawer.querySelector('h2')!.id)
+    expect(document.body.style.overflow).toBe('hidden') // 뒤 화면이 같이 스크롤되지 않게
+
+    const last = c.querySelector<HTMLElement>('#in2')!
+    last.focus()
+    press('Tab')
+    expect(document.activeElement).toBe(closeButton(drawer)) // 끝에서 Tab → 처음으로
+    press('Tab', true)
+    expect(document.activeElement).toBe(last) // 처음에서 Shift+Tab → 끝으로
+
+    press('Escape')
+    expect(c.querySelector('[role=dialog]')).toBeNull()
+    expect(document.activeElement).toBe(opener)
+    expect(document.body.style.overflow).toBe('')
+  })
+
+  it('안에 스크롤되는 표가 있으면 Tab 으로 거기까지 갈 수 있다 (표를 건너뛰고 처음으로 돌지 않는다)', async () => {
+    function WithTable() {
+      const [open, setOpen] = useState(true)
+      return (
+        <Drawer open={open} onClose={() => setOpen(false)} title="표가 있는 창">
+          <button id="last-button" type="button">
+            마지막 단추
+          </button>
+          <div className="table-scroll" id="scroller" tabIndex={-1}>
+            긴 표
+          </div>
+        </Drawer>
+      )
+    }
+    const c = await render(<WithTable />)
+    const drawer = c.querySelector<HTMLElement>('[role=dialog]')!
+    const scroller = c.querySelector<HTMLElement>('#scroller')!
+    // 내용이 넘쳐 스크롤되는 상태를 흉내 낸다 (가상 브라우저는 크기를 계산하지 않는다)
+    Object.defineProperty(scroller, 'scrollHeight', { value: 746 })
+    Object.defineProperty(scroller, 'clientHeight', { value: 358 })
+    const tab = () => {
+      const ev = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+      act(() => {
+        document.activeElement!.dispatchEvent(ev)
+      })
+      return ev
+    }
+    c.querySelector<HTMLElement>('#last-button')!.focus()
+    expect(tab().defaultPrevented).toBe(false) // 브라우저가 표로 넘어가게 둔다
+    scroller.focus()
+    expect(tab().defaultPrevented).toBe(true) // 표가 진짜 끝 → 처음으로
+    expect(document.activeElement).toBe(closeButton(drawer))
+
+    // 스크롤 상자에 Tab 이 가지 않는 브라우저에서는 포커스가 창 밖으로 빠진다 → 다시 안으로 데려온다
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    try {
+      c.querySelector<HTMLElement>('#last-button')!.focus()
+      expect(tab().defaultPrevented).toBe(false)
+      outside.focus() // 브라우저가 뒤 화면의 단추로 옮긴 상황
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 30))
+      })
+      expect(document.activeElement).toBe(closeButton(drawer))
+    } finally {
+      outside.remove()
+    }
+  })
+
+  it('창 두 개가 겹쳐 열렸다가 하나만 닫혀도 뒤 화면 스크롤 잠금은 유지된다', async () => {
+    const c = await render(<Harness second />)
+    act(() => c.querySelector<HTMLButtonElement>('#opener')!.click())
+    act(() => c.querySelector<HTMLButtonElement>('#open2')!.click())
+    expect(c.querySelectorAll('[role=dialog]')).toHaveLength(2)
+    expect(document.body.style.overflow).toBe('hidden')
+    const second = [...c.querySelectorAll<HTMLElement>('[role=dialog]')].find((d) => d.textContent!.includes('둘째 창'))!
+    act(() => closeButton(second).click())
+    expect(c.querySelectorAll('[role=dialog]')).toHaveLength(1)
+    expect(document.body.style.overflow).toBe('hidden')
+    act(() => closeButton(c.querySelector('[role=dialog]')!).click())
+    expect(document.body.style.overflow).toBe('')
+  })
+
+  it('문항 상세를 연 채 다른 탭으로 가면 그 탭에서 저절로 다시 열리지 않는다', async () => {
+    await loadExam()
+    window.location.hash = '#/results/items'
+    const c = await render(<App />)
+    act(() => useAppStore.getState().setUi({ selectedItemNo: 3 }))
+    expect(c.querySelector('[role=dialog]')!.textContent).toContain('문항 3')
+    await act(async () => {
+      window.location.hash = '#/results/levels'
+      window.dispatchEvent(new Event('hashchange'))
+    })
+    expect(c.querySelector('#tab-levels')!.getAttribute('aria-selected')).toBe('true')
+    expect(c.querySelector('[role=dialog]')).toBeNull()
+    expect(useAppStore.getState().ui.selectedItemNo).toBeNull()
+  })
+})
+
+describe('파일을 엉뚱한 화면에 떨어뜨렸을 때', () => {
+  /** 파일을 끄는 중이면 dataTransfer.types 에 'Files' 가 들어 있다 */
+  const dropEvent = (type: 'dragover' | 'drop', files: File[] = [], types: string[] = ['Files']) => {
+    const ev = new Event(type, { bubbles: true, cancelable: true })
+    Object.defineProperty(ev, 'dataTransfer', { value: { files, types } })
+    return ev
+  }
+
+  it('글자를 끌어다 놓는 것(검색 칸에 붙이기 등)은 막지 않는다', async () => {
+    await loadExam()
+    window.location.hash = '#/results/students'
+    await render(<App />)
+    for (const type of ['dragover', 'drop'] as const) {
+      const ev = dropEvent(type, [], ['text/plain'])
+      act(() => {
+        window.dispatchEvent(ev)
+      })
+      expect(ev.defaultPrevented, type).toBe(false)
+    }
+  })
+
+  it('결과·사용 안내·인쇄 화면에서는 브라우저가 그 파일로 넘어가지 않게 막는다', async () => {
+    await loadExam()
+    for (const hash of ['#/results/overview', '#/guide', '#/print/report']) {
+      window.location.hash = hash
+      const c = await render(<App />)
+      for (const type of ['dragover', 'drop'] as const) {
+        const ev = dropEvent(type)
+        act(() => {
+          window.dispatchEvent(ev)
+        })
+        expect(ev.defaultPrevented, `${hash} ${type}`).toBe(true)
+      }
+      expect(useAppStore.getState().exam).not.toBeNull() // 올려 둔 자료는 그대로
+      act(() => root?.unmount())
+      c.remove()
+    }
+  })
+
+  it('파일 올리기 화면에서는 카드 밖에 떨어뜨려도 지금처럼 받는다 (다른 화면을 거쳐 돌아온 뒤에도)', async () => {
+    const fx = makeAnswerSheet({ classNo: 1, nItems: 10, nStudents: 8, style: '_2', seed: 3, keys: KEYS, points: POINTS })
+    const file = new File([aoaToXlsxBuffer(fx.aoa) as Uint8Array<ArrayBuffer>], '1반.xlsx', { type: XLSX_TYPE, lastModified: 1 })
+    window.location.hash = '#/guide'
+    await render(<App />)
+    await act(async () => {
+      window.location.hash = '#/'
+      window.dispatchEvent(new Event('hashchange'))
+    })
+    const ev = dropEvent('drop', [file])
+    act(() => {
+      window.dispatchEvent(ev)
+    })
+    expect(ev.defaultPrevented).toBe(true)
+    await vi.waitFor(() => expect(useAppStore.getState().exam).not.toBeNull(), { timeout: 20000 })
+    expect(useAppStore.getState().files.map((f) => f.name)).toEqual(['1반.xlsx'])
+  })
+})
+
+describe('학급 필터를 걸었을 때', () => {
+  it('문항분석표 재구성의 반 선택과 학생 리포트 인쇄 단추에도 고른 반만 나온다', async () => {
+    await loadExam()
+    useAppStore.getState().setUi({ classFilter: ['2'] })
+    let c = await render(<ResultsPage tab="classes" />)
+    const select = c.querySelector('select')!
+    expect([...select.querySelectorAll('option')].map((o) => o.textContent)).toEqual(['2반'])
+    expect(select.value).toBe('2')
+    expect(c.textContent).toMatch(/2반 문항분석표/)
+    act(() => root?.unmount())
+    c.remove()
+    c = await render(<ResultsPage tab="students" />)
+    const printButtons = [...c.querySelectorAll('button')].map((b) => b.textContent ?? '').filter((t) => /리포트 인쇄/.test(t))
+    expect(printButtons).toEqual(['2반 리포트 인쇄'])
+  })
+})
+
+describe('개요 화면', () => {
+  it('최고점과 최저점을 보여 준다', async () => {
+    await loadExam()
+    const c = await render(<ResultsPage tab="overview" />)
+    const tiles = Object.fromEntries([...c.querySelectorAll('.kpi')].map((k) => [k.querySelector('.kpi-label')!.textContent, k.querySelector('.kpi-value')!.textContent]))
+    const totals = useAppStore.getState().exam!.classes.flatMap((cl) => cl.students.map((s) => s.neis.total))
+    expect(tiles['최고점']).toBe(String(Math.max(...totals)))
+    expect(tiles['최저점']).toBe(String(Math.min(...totals)))
+  })
+})
+
 describe('화면 하단 안내 (문의·참고용 안내·만든 곳)', () => {
   const CONTACT = '사용하면서 불편한 점이나 개선 아이디어는 raphres@sen.go.kr로 보내 주세요.'
   const NOTICE = '공식 성적과 성취도는 NEIS 기준입니다'
   const MAKER = '서울특별시교육청 학생평가지원단 교사가 만들었습니다.'
   const count = (text: string, needle: string) => text.split(needle).length - 1
 
-  it('파일 올리기·결과·사용 안내 화면에 문의 문구가 한 번씩 나오고 메일 주소는 링크다', async () => {
+  it('파일 올리기·결과·사용 안내 화면에 문의 문구가 한 번씩 나오고, 메일 주소는 링크가 아닌 글자다', async () => {
     await loadExam()
     for (const el of [<UploadPage key="u" />, <ResultsPage key="r" tab="overview" />, <GuidePage key="g" />]) {
       const c = await render(el)
       const text = c.textContent ?? ''
       expect(count(text, CONTACT)).toBe(1)
-      expect(c.querySelector('a[href="mailto:raphres@sen.go.kr"]')).not.toBeNull()
+      // 학교 PC 에는 기본 메일 프로그램이 없어 눌러도 반응이 없으므로 링크로 만들지 않는다
+      expect(c.querySelector('a[href^="mailto:"]')).toBeNull()
       const foot = c.querySelector('footer.site-foot')!
       expect(foot.textContent).toContain(NOTICE)
       expect(foot.textContent).toContain(MAKER)

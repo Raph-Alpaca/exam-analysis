@@ -12,6 +12,8 @@
   html,
   body {
     background: #fff !important;
+    /* 옆 창(서랍)을 연 채 인쇄해도 스크롤 잠금 때문에 첫 쪽에서 잘리지 않게 */
+    overflow: visible !important;
     font-size: 10.5pt;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;

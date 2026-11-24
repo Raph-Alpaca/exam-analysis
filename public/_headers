@@ -1,8 +1,20 @@
-# Cloudflare Pages 응답 헤더
+# Netlify·Cloudflare Pages 응답 헤더
+#
+# Content-Security-Policy: 스크립트·글꼴·통신(fetch 등)을 같은 출처로만 제한한다.
+#   - 바깥 서버에서 코드를 불러오거나, 바깥 서버로 자료를 전송(fetch·양식 제출 등)하는 것을 브라우저가 막는다.
+#     (다른 주소로 페이지를 옮기는 것까지 막지는 못한다. 그런 코드는 이 사이트에 없다.)
+#   - style-src 의 'unsafe-inline' 은 그래프(ECharts) 툴팁이 인라인 style 속성을 쓰기 때문에 필요하다.
+#   - img-src 의 data: 는 파비콘(index.html) 때문에 필요하다.
+#   - 엑셀 내보내기(blob 주소로 내려받기)는 이 정책의 제한을 받지 않는다.
+# 헤더를 바꾸면 배포 전에 실제 헤더를 붙인 상태로 전 화면(그래프 툴팁·엑셀 내보내기·인쇄)을 확인할 것.
+# Cloudflare Pages 는 값 안에서 콜론(:) 바로 뒤에 글자가 오면 자리표시자로 해석하므로 값을 바꿀 때 주의.
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
 
 # 파일 이름에 해시가 들어가는 빌드 산출물은 오래 캐시한다
 /assets/*

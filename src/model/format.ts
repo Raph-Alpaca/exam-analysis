@@ -9,14 +9,19 @@ function ok(v: number | null | undefined): v is number {
   return v != null && Number.isFinite(v)
 }
 
+/** "-0.00"처럼 0으로 보이는 음수에서는 부호를 뗀다 (계산 오차로 -1.9e-17 같은 값이 나온다) */
+function unsignZero(s: string): string {
+  return /^[-−]0(?:\.0+)?$/.test(s) ? s.slice(1) : s
+}
+
 export function fmt1(v: number | null | undefined): string {
-  return ok(v) ? nf1.format(v) : DASH
+  return ok(v) ? unsignZero(nf1.format(v)) : DASH
 }
 export function fmt2(v: number | null | undefined): string {
-  return ok(v) ? nf2.format(v) : DASH
+  return ok(v) ? unsignZero(nf2.format(v)) : DASH
 }
 export function fmt3(v: number | null | undefined): string {
-  return ok(v) ? nf3.format(v) : DASH
+  return ok(v) ? unsignZero(nf3.format(v)) : DASH
 }
 export function fmtInt(v: number | null | undefined): string {
   return ok(v) ? nf0.format(v) : DASH

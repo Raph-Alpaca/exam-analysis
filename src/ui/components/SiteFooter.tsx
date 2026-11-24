@@ -1,11 +1,14 @@
 /** 문의 메일 주소 */
 const CONTACT_EMAIL = 'raphres@sen.go.kr'
 
-/** 문의 안내 문장. 화면 하단과 사용 안내의 "문의" 항목이 함께 쓴다. (메일 주소는 누르면 메일 쓰기로 이어진다) */
+/**
+ * 문의 안내 문장. 화면 하단과 사용 안내의 "문의" 항목이 함께 쓴다.
+ * 메일 주소는 링크로 만들지 않는다(학교 PC 에는 기본 메일 프로그램이 없어 눌러도 반응이 없다).
+ */
 export function ContactLine() {
   return (
     <>
-      사용하면서 불편한 점이나 개선 아이디어는 <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>로 보내 주세요.
+      사용하면서 불편한 점이나 개선 아이디어는 <span className="nowrap">{CONTACT_EMAIL}</span>로 보내 주세요.
     </>
   )
 }

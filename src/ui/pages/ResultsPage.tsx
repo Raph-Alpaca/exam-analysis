@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { useAnalysis } from '../store/useAnalysis'
 import { navigate } from '../app/router'
@@ -67,6 +67,15 @@ export function ResultsPage({ tab }: { tab: ResultTab }) {
   useEffect(() => {
     document.title = exam ? `${describeHeader(exam.header)} — 성취평가 결과 분석` : '성취평가 결과 분석'
   }, [exam])
+
+  // 다른 탭으로 옮기면 열어 둔 문항·학생 상세는 닫는다. 선택이 남아 있으면 옮겨 간 탭에서 서랍이 저절로 다시 열린다.
+  // (화면에 그려지기 전에 닫히도록 layout effect. 처음 들어올 때는 건드리지 않는다.)
+  const shownTab = useRef(activeTab)
+  useLayoutEffect(() => {
+    if (shownTab.current === activeTab) return
+    shownTab.current = activeTab
+    setUi({ selectedItemNo: null, selectedStudentId: null })
+  }, [activeTab, setUi])
 
   if (!exam || !result) {
     return (

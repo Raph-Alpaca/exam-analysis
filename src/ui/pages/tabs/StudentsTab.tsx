@@ -44,10 +44,10 @@ export function StudentsTab({ exam, result }: { exam: Exam; result: AnalysisResu
                 <Icon name="search" />
                 <input type="search" placeholder="이름·번호·학번으로 찾기" value={q} onChange={(e) => setQ(e.target.value)} aria-label="학생 찾기" />
               </label>
-              {exam.classes.map((c) => (
-                <button key={c.classNo} type="button" className="btn btn-sm" onClick={() => navigate(`/print/class/${c.classNo}`)}>
+              {result.classNos.map((c) => (
+                <button key={c} type="button" className="btn btn-sm" onClick={() => navigate(`/print/class/${c}`)}>
                   <Icon name="printer" />
-                  {c.classNo}반 리포트 인쇄
+                  {c}반 리포트 인쇄
                 </button>
               ))}
             </div>

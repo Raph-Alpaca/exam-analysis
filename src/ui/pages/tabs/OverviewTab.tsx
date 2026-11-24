@@ -3,7 +3,7 @@ import type { AnalysisResult, Exam, GroupStats, Level } from '../../../model/typ
 import { useAppStore } from '../../store/useAppStore'
 import { alphaBand } from '../../../model/thresholds'
 import { cutoffMarks, describeCutoffs } from '../../../model/settings'
-import { describeCrPart, fmt1, fmt3, fmtInt } from '../../../model/format'
+import { describeCrPart, fmt1, fmt3, fmtInt, fmtPoints } from '../../../model/format'
 import { BandBadge, KpiTile, LevelChip, SectionTitle } from '../../components/basic'
 import { DataTable, type Column } from '../../components/DataTable'
 import { LevelStackedBar, ScoreHistogram } from '../../charts/charts'
@@ -39,12 +39,16 @@ export function OverviewTab({ exam, result }: { exam: Exam; result: AnalysisResu
   const groups = [{ name: '전체', stats: o }, ...result.classNos.map((c) => ({ name: `${c}반`, stats: result.byClass[c]! }))]
   const lowest = result.activeLevels[result.activeLevels.length - 1]!
   const marks = useMemo(() => cutoffMarks(settings), [settings])
+  /** 그 총점을 받은 학생 수 */
+  const countAt = (score: number) => result.students.filter((s) => s.total === score).length
   return (
     <div className="stack">
       <div className="grid grid-kpi">
         <KpiTile label="응답자" value={`${fmtInt(o.n)}명`} sub={`${result.classNos.length}개 반`} />
         <KpiTile label="문항" value={`${result.mcCount}문항`} sub={describeCrPart(result.crCount, exam.maxima.cr)} />
         <KpiTile label={`평균 (${exam.maxima.total}점 만점)`} value={fmt1(o.total.mean)} sub={`표준편차 ${fmt1(o.total.sd)} (${settings.sdMode === 'population' ? '모집단' : '표본'})`} />
+        <KpiTile label="최고점" value={fmtPoints(o.totalMax)} sub={o.totalMax == null ? undefined : `${countAt(o.totalMax)}명`} />
+        <KpiTile label="최저점" value={fmtPoints(o.totalMin)} sub={o.totalMin == null ? undefined : `${countAt(o.totalMin)}명`} />
         <KpiTile label="신뢰도 α (선다형)" value={fmt3(o.alphaMc)} sub={<BandBadge band={alphaBand(o.alphaMc)} />} />
         <KpiTile label="성취수준 A 비율" value={`${fmt1(o.levelPct.A)}%`} sub={`${lowest} ${fmt1(o.levelPct[lowest])}%`} />
       </div>

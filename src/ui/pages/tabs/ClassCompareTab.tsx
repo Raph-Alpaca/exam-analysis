@@ -91,7 +91,9 @@ export function NeisItemTable({ exam, classNo }: { exam: Exam; classNo: string }
 }
 
 export function ClassCompareTab({ exam, result }: { exam: Exam; result: AnalysisResult }) {
-  const [neisClass, setNeisClass] = useState(result.classNos[0] ?? exam.classes[0]?.classNo ?? '')
+  const [pickedClass, setNeisClass] = useState(result.classNos[0] ?? exam.classes[0]?.classNo ?? '')
+  // 학급 필터에서 빠진 반은 고를 수 없다. 고른 반이 필터에서 빠지면 첫 반으로 돌아간다.
+  const neisClass = result.classNos.includes(pickedClass) ? pickedClass : (result.classNos[0] ?? pickedClass)
   const groups = result.classNos.map((c) => ({ name: `${c}반`, stats: result.byClass[c]! }))
   return (
     <div className="stack">
@@ -114,9 +116,9 @@ export function ClassCompareTab({ exam, result }: { exam: Exam; result: Analysis
             <label className="row small">
               반 선택
               <select value={neisClass} onChange={(e) => setNeisClass(e.target.value)}>
-                {exam.classes.map((c) => (
-                  <option key={c.classNo} value={c.classNo}>
-                    {c.classNo}반
+                {result.classNos.map((c) => (
+                  <option key={c} value={c}>
+                    {c}반
                   </option>
                 ))}
               </select>

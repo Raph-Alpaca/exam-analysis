@@ -294,7 +294,8 @@ export async function buildWorkbook(exam: Exam, result: AnalysisResult, settings
   // 6. 문항분석표_재구성 (NEIS 양식)
   {
     const ws = wb.addWorksheet('문항분석표_재구성')
-    const tables = exam.classes.map((c) => buildNeisTable(exam, c.classNo, settings)).filter((t): t is NonNullable<typeof t> => t != null)
+    // 다른 시트와 마찬가지로 학급 필터에서 고른 반만 싣는다 (괄호 안 전체 수치는 필터와 무관한 비교 기준)
+    const tables = result.classNos.map((c) => buildNeisTable(exam, c, settings)).filter((t): t is NonNullable<typeof t> => t != null)
     let r = addTitle(ws, '문항분석표 (NEIS 양식 재구성)', `${meta} · 괄호 안 = ${tables[0]?.gradeLabel ?? ''}`, 12)
     for (const t of tables) {
       const rows: Cell[][] = t.rows.map((x) => [x.no, ...x.cells, x.sum, x.keyText, x.p, x.blank, x.multi])

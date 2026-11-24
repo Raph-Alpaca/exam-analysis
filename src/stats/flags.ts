@@ -1,5 +1,5 @@
 import { CHOICES, type Flag, type ItemStats } from '../model/types'
-import { THRESHOLDS } from '../model/thresholds'
+import { DISC_DIGITS, shownValue, THRESHOLDS } from '../model/thresholds'
 
 export function computeFlags(s: Omit<ItemStats, 'flags'>): Flag[] {
   const flags: Flag[] = []
@@ -8,8 +8,10 @@ export function computeFlags(s: Omit<ItemStats, 'flags'>): Flag[] {
     else if (s.p < THRESHOLDS.lowP) flags.push({ code: 'low-p', severity: 'warn', label: `정답률 ${THRESHOLDS.lowP}% 미만` })
   }
   if (s.disc != null) {
-    if (s.disc < 0) flags.push({ code: 'neg-disc', severity: 'danger', label: '변별도 음수' })
-    else if (s.disc < THRESHOLDS.lowDisc) flags.push({ code: 'low-disc', severity: 'warn', label: `변별도 ${THRESHOLDS.lowDisc} 미만` })
+    // 판정 배지(discBand)와 같이, 표에 보이는 값으로 본다
+    const disc = shownValue(s.disc, DISC_DIGITS)
+    if (disc < 0) flags.push({ code: 'neg-disc', severity: 'danger', label: '변별도 음수' })
+    else if (disc < THRESHOLDS.lowDisc) flags.push({ code: 'low-disc', severity: 'warn', label: `변별도 ${THRESHOLDS.lowDisc} 미만` })
   }
   if (s.expected && s.observed3 && s.expected !== s.observed3) {
     const strong = (s.expected === '어려움' && s.observed3 === '쉬움') || (s.expected === '쉬움' && s.observed3 === '어려움')

@@ -123,6 +123,9 @@ export interface MeanSd {
 export interface GroupStats {
   n: number
   total: MeanSd
+  /** 총점의 최저점·최고점 (학생이 없으면 null) */
+  totalMin: number | null
+  totalMax: number | null
   mc: MeanSd
   cr: MeanSd
   levelCounts: Record<Level, number>

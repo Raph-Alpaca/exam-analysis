@@ -20,9 +20,12 @@ function groupStats(scored: readonly Scored[], levels: readonly Level[], setting
   for (const l of levels) counts[l]++
   const pctRec = emptyLevelRecord(() => 0)
   for (const l of LEVELS) pctRec[l] = scored.length ? (100 * counts[l]) / scored.length : 0
+  const totals = scored.map((s) => s.total)
   return {
     n: scored.length,
-    total: meanSd(scored.map((s) => s.total), settings.sdMode),
+    total: meanSd(totals, settings.sdMode),
+    totalMin: totals.length ? Math.min(...totals) : null,
+    totalMax: totals.length ? Math.max(...totals) : null,
     mc: meanSd(scored.map((s) => s.mcScore), settings.sdMode),
     cr: meanSd(scored.map((s) => s.crScore), settings.sdMode),
     levelCounts: counts,
