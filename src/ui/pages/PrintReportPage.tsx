@@ -9,7 +9,7 @@ import { describeHeader } from '../../parsers/header'
 import { BandBadge, EmptyState, KpiTile, LevelChip } from '../components/basic'
 import { DataTable } from '../components/DataTable'
 import { LevelStackedBar, ScoreHistogram, StandardAchievementBar } from '../charts/charts'
-import { LevelStatsTable } from './tabs/OverviewTab'
+import { LevelStatsTable, ScoreRangeTiles } from './tabs/OverviewTab'
 import { ClassStatsTable, ItemByClassTable } from './tabs/ClassCompareTab'
 import { itemColumns } from './tabs/ItemAnalysisTab'
 import { levelMatrixColumns, levelMatrixRows } from './tabs/LevelAnalysisTab'
@@ -111,10 +111,11 @@ export function PrintReportPage() {
           <p className="muted">
             {meta}. {new Date().toLocaleDateString('ko-KR')} 작성
           </p>
-          <div className="grid grid-kpi">
+          <div className="grid grid-kpi grid-kpi-6">
             <KpiTile label="응답자" value={`${fmtInt(o.n)}명`} />
             <KpiTile label="문항" value={`${result.mcCount}문항`} sub={describeCrPart(result.crCount, exam.maxima.cr)} />
             <KpiTile label={`평균 (${exam.maxima.total}점)`} value={fmt1(o.total.mean)} sub={`표준편차 ${fmt1(o.total.sd)}`} />
+            <ScoreRangeTiles result={result} />
             <KpiTile label="신뢰도 α" value={fmt3(o.alphaMc)} sub={<BandBadge band={alphaBand(o.alphaMc)} />} />
           </div>
           <h3 style={{ marginTop: 14 }}>성취수준 분포</h3>

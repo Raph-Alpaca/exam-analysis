@@ -482,6 +482,24 @@ describe('개요 화면', () => {
     expect(tiles['최고점']).toBe(String(Math.max(...totals)))
     expect(tiles['최저점']).toBe(String(Math.min(...totals)))
   })
+
+  it('인쇄 보고서의 요약에도 최고점과 최저점이 나온다 (학급 필터를 걸면 고른 반의 값)', async () => {
+    await loadExam()
+    const classes = useAppStore.getState().exam!.classes
+    const tilesOf = (c: HTMLElement) => Object.fromEntries([...c.querySelectorAll('.kpi')].map((k) => [k.querySelector('.kpi-label')!.textContent, `${k.querySelector('.kpi-value')!.textContent} / ${k.querySelector('.kpi-sub')?.textContent ?? ''}`]))
+    let c = await render(<PrintReportPage />)
+    const all = classes.flatMap((cl) => cl.students.map((s) => s.neis.total))
+    const count = (xs: number[], v: number) => xs.filter((x) => x === v).length
+    expect(tilesOf(c)['최고점']).toBe(`${Math.max(...all)} / ${count(all, Math.max(...all))}명`)
+    expect(tilesOf(c)['최저점']).toBe(`${Math.min(...all)} / ${count(all, Math.min(...all))}명`)
+    act(() => root?.unmount())
+    c.remove()
+    useAppStore.getState().setUi({ classFilter: ['2'] })
+    c = await render(<PrintReportPage />)
+    const second = classes.find((cl) => cl.classNo === '2')!.students.map((s) => s.neis.total)
+    expect(tilesOf(c)['최고점']).toBe(`${Math.max(...second)} / ${count(second, Math.max(...second))}명`)
+    expect(tilesOf(c)['최저점']).toBe(`${Math.min(...second)} / ${count(second, Math.min(...second))}명`)
+  })
 })
 
 describe('화면 하단 안내 (문의·참고용 안내·만든 곳)', () => {

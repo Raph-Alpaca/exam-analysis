@@ -156,6 +156,16 @@
 .print-view .kpi .kpi-value {
   font-size: 1.2rem;
 }
+/* 보고서 요약의 타일 여섯 개(응답자·문항·평균·최고점·최저점·신뢰도)는 한 줄에 */
+.print-view .grid-kpi-6 {
+  grid-template-columns: repeat(6, 1fr);
+}
+/* 칸이 좁으므로 화면 미리보기에서도 인쇄할 때처럼 안쪽 여백을 줄여 글자가 꺾이지 않게 한다 (인쇄 때 여백은 위 @media print 의 .kpi) */
+@media screen {
+  .print-view .grid-kpi-6 .kpi {
+    padding: 10px 10px 9px;
+  }
+}
 .student-compact .stack > * + * {
   margin-top: 8px;
 }

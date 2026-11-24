@@ -33,22 +33,31 @@ export function LevelStatsTable({ result, exam, caption }: { result: AnalysisRes
   return <DataTable columns={cols} rows={rows} footerRows={footer} rowKey={(r) => r.label} caption={caption} compact />
 }
 
+/** 최고점·최저점 타일 (그 점수를 받은 학생 수와 함께). 개요 화면과 인쇄 보고서 요약이 함께 쓴다. */
+export function ScoreRangeTiles({ result }: { result: AnalysisResult }) {
+  const o = result.overview
+  const countAt = (score: number) => result.students.filter((s) => s.total === score).length
+  return (
+    <>
+      <KpiTile label="최고점" value={fmtPoints(o.totalMax)} sub={o.totalMax == null ? undefined : `${countAt(o.totalMax)}명`} />
+      <KpiTile label="최저점" value={fmtPoints(o.totalMin)} sub={o.totalMin == null ? undefined : `${countAt(o.totalMin)}명`} />
+    </>
+  )
+}
+
 export function OverviewTab({ exam, result }: { exam: Exam; result: AnalysisResult }) {
   const settings = useAppStore((s) => s.settings)
   const o = result.overview
   const groups = [{ name: '전체', stats: o }, ...result.classNos.map((c) => ({ name: `${c}반`, stats: result.byClass[c]! }))]
   const lowest = result.activeLevels[result.activeLevels.length - 1]!
   const marks = useMemo(() => cutoffMarks(settings), [settings])
-  /** 그 총점을 받은 학생 수 */
-  const countAt = (score: number) => result.students.filter((s) => s.total === score).length
   return (
     <div className="stack">
       <div className="grid grid-kpi">
         <KpiTile label="응답자" value={`${fmtInt(o.n)}명`} sub={`${result.classNos.length}개 반`} />
         <KpiTile label="문항" value={`${result.mcCount}문항`} sub={describeCrPart(result.crCount, exam.maxima.cr)} />
         <KpiTile label={`평균 (${exam.maxima.total}점 만점)`} value={fmt1(o.total.mean)} sub={`표준편차 ${fmt1(o.total.sd)} (${settings.sdMode === 'population' ? '모집단' : '표본'})`} />
-        <KpiTile label="최고점" value={fmtPoints(o.totalMax)} sub={o.totalMax == null ? undefined : `${countAt(o.totalMax)}명`} />
-        <KpiTile label="최저점" value={fmtPoints(o.totalMin)} sub={o.totalMin == null ? undefined : `${countAt(o.totalMin)}명`} />
+        <ScoreRangeTiles result={result} />
         <KpiTile label="신뢰도 α (선다형)" value={fmt3(o.alphaMc)} sub={<BandBadge band={alphaBand(o.alphaMc)} />} />
         <KpiTile label="성취수준 A 비율" value={`${fmt1(o.levelPct.A)}%`} sub={`${lowest} ${fmt1(o.levelPct[lowest])}%`} />
       </div>

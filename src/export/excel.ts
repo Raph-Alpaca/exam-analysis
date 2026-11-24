@@ -190,9 +190,9 @@ export async function buildWorkbook(exam: Exam, result: AnalysisResult, settings
     const ws = wb.addWorksheet('성취도분석')
     let r = addTitle(ws, '성취도분석표', meta, 9)
     r = addTable(ws, r, {
-      columns: [{ header: '문항 수', width: 10 }, { header: '서답형', width: 24 }, { header: '응답자 수', width: 10 }, { header: '검사신뢰도(α, 선다형)', width: 18, fmt: '0.000' }, { header: 'α(배점 가중)', width: 12, fmt: '0.000' }],
+      columns: [{ header: '문항 수', width: 10 }, { header: '서답형', width: 24 }, { header: '응답자 수', width: 10 }, { header: '최고점', width: 8 }, { header: '최저점', width: 8 }, { header: '검사신뢰도(α, 선다형)', width: 18, fmt: '0.000' }, { header: 'α(배점 가중)', width: 12, fmt: '0.000' }],
       // 서답형이 NEIS 총점으로만 있으면 문항 수에 들어가지 않으므로 따로 적는다
-      rows: [[result.mcCount + result.crCount, result.crCount ? `${result.crCount}문항 포함` : hasCr ? `총점 ${fmtPoints(exam.maxima.cr)}점 (문항별 열 없음)` : '없음', o.n, fmtOrNull(o.alphaMc), fmtOrNull(o.alphaAll)]],
+      rows: [[result.mcCount + result.crCount, result.crCount ? `${result.crCount}문항 포함` : hasCr ? `총점 ${fmtPoints(exam.maxima.cr)}점 (문항별 열 없음)` : '없음', o.n, fmtOrNull(o.totalMax), fmtOrNull(o.totalMin), fmtOrNull(o.alphaMc), fmtOrNull(o.alphaAll)]],
     })
     const g = (x: GroupStats) => [fmtOrNull(x.mc.mean), fmtOrNull(x.mc.sd), ...(hasCr ? [fmtOrNull(x.cr.mean), fmtOrNull(x.cr.sd)] : []), fmtOrNull(x.total.mean), fmtOrNull(x.total.sd)]
     r = addTable(

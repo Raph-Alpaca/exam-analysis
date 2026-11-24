@@ -296,4 +296,20 @@ describe('최고점·최저점', () => {
     expect(none.overview.totalMax).toBeNull()
     expect(none.overview.totalMin).toBeNull()
   })
+
+  it('엑셀의 성취도분석 시트에도 최고점·최저점이 들어간다 (학급 필터를 걸면 고른 반의 값)', async () => {
+    const { exam } = buildExam(await examWithCrColumn())
+    for (const classFilter of [undefined, ['2']]) {
+      const result = analyze(exam!, DEFAULT_SETTINGS, { classFilter })
+      const wb = await buildWorkbook(exam!, result, DEFAULT_SETTINGS)
+      const read = XLSX.read(await wb.xlsx.writeBuffer(), { type: 'array' })
+      const rows = XLSX.utils.sheet_to_json<Row>(read.Sheets['성취도분석']!, { header: 1 })
+      const hdr = rows.findIndex((r) => r.includes('응답자 수'))
+      const cell = (name: string) => rows[hdr + 1]![rows[hdr]!.indexOf(name)]
+      expect(cell('응답자 수')).toBe(result.overview.n)
+      expect(cell('최고점')).toBe(result.overview.totalMax)
+      expect(cell('최저점')).toBe(result.overview.totalMin)
+      expect(typeof cell('최고점')).toBe('number')
+    }
+  })
 })
