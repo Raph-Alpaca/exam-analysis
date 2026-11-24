@@ -121,7 +121,8 @@ function addTable(ws: Worksheet, startRow: number, spec: TableSpec, caption?: st
 }
 
 function itemRows(stats: ItemStats[], exam: Exam, extra?: (s: ItemStats) => Cell[]): Cell[][] {
-  const byNo = new Map(exam.items.map((i) => [i.no, i]))
+  // 서답형 열("서답1"…)도 번호가 1부터라 선다형 번호와 겹친다. 이 표는 선다형 문항만 다룬다.
+  const byNo = new Map(exam.items.filter((i) => i.kind === 'mc').map((i) => [i.no, i]))
   const info = exam.hasItemInfo
   return stats.map((s) => {
     const it = byNo.get(s.no)
@@ -160,7 +161,7 @@ function standardRows(list: StandardStats[], result: AnalysisResult, kind: 'stan
   ]
   const rows: Cell[][] = list.map((s) => [
     ...(kind === 'standard' ? [s.code, s.text, s.domain ?? ''] : [s.code]),
-    s.itemNos.join(', '),
+    s.itemLabels.join(', '),
     s.itemNos.length,
     s.maxPoints,
     fmtOrNull(s.overall.raw.mean),
@@ -261,7 +262,8 @@ export async function buildWorkbook(exam: Exam, result: AnalysisResult, settings
       columns: [{ header: '성취수준', width: 9 }, { header: '학생 수', width: 8 }, { header: '문항', width: 6 }, { header: '정답', width: 6 }, { header: '정답률(%)', width: 10, fmt: '0.0' }, ...CHOICES.map((c) => ({ header: String(c), group: '답지반응률(%)', width: 7, fmt: '0.0' })), { header: '무응답/중복', group: '답지반응률(%)', width: 10, fmt: '0.0' }],
       rows,
     })
-    ws.autoFilter = { from: { row: r + 2, column: 1 }, to: { row: r + 1 + rows.length, column: 11 } }
+    // 머리글이 2단(r, r+1)이므로 필터 머리글은 아래 행(r+1)이다. 자료는 r+2 부터.
+    ws.autoFilter = { from: { row: r + 1, column: 1 }, to: { row: r + 1 + rows.length, column: 11 } }
   }
 
   // 4. 성취수준별_상하위
@@ -286,7 +288,7 @@ export async function buildWorkbook(exam: Exam, result: AnalysisResult, settings
     const rows: Cell[][] = []
     for (const c of result.classNos) rows.push(...itemRows(result.itemsByClass[c]!, exam, () => [`${c}반`, result.byClass[c]!.n]))
     addTable(ws, r, { columns: ITEM_COLS(exam, [{ header: '학급', width: 7 }, { header: '학생 수', width: 8 }]), rows })
-    ws.autoFilter = { from: { row: r + 2, column: 1 }, to: { row: r + 1 + rows.length, column: 5 } }
+    ws.autoFilter = { from: { row: r + 1, column: 1 }, to: { row: r + 1 + rows.length, column: 5 } }
   }
 
   // 6. 문항분석표_재구성 (NEIS 양식)

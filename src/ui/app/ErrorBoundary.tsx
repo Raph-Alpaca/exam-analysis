@@ -4,10 +4,19 @@ interface State {
   error: Error | null
 }
 
-export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
+interface Props {
+  children: ReactNode
+  /** 이 값(주소)이 바뀌면 오류 화면을 풀고 다시 그려 본다 */
+  resetKey?: string
+}
+
+export class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null }
   static getDerivedStateFromError(error: Error): State {
     return { error }
+  }
+  componentDidUpdate(prev: Props) {
+    if (this.state.error && prev.resetKey !== this.props.resetKey) this.setState({ error: null })
   }
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[exam-analysis]', error.message, info.componentStack)

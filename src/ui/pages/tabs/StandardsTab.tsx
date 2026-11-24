@@ -16,7 +16,7 @@ export function standardColumns(result: AnalysisResult, opts: { kind: 'standard'
     cols.push({ id: 'code', header: '내용영역', accessor: (r) => r.code, cell: (r) => <strong>{r.code}</strong>, sortable: true })
   }
   cols.push(
-    { id: 'items', header: '문항', cell: (r) => <span className="small">{r.itemNos.join(', ')}</span>, accessor: (r) => r.itemNos.length, sortable: true },
+    { id: 'items', header: '문항', cell: (r) => <span className="small">{r.itemLabels.join(', ')}</span>, accessor: (r) => r.itemNos.length, sortable: true },
     { id: 'n', header: '문항 수', accessor: (r) => r.itemNos.length, cell: (r) => fmtInt(r.itemNos.length) },
     { id: 'max', header: '만점', accessor: (r) => r.maxPoints, cell: (r) => fmtPoints(r.maxPoints) },
     { id: 'rawm', header: '평균', group: '원점수', accessor: (r) => r.overall.raw.mean, cell: (r) => fmt1(r.overall.raw.mean) },
@@ -74,7 +74,7 @@ export function StandardsTab({ exam, result }: { exam: Exam; result: AnalysisRes
                 <strong>{s.code}</strong> <span className="badge badge-warn">{fmt1(s.overall.rate)}%</span>
                 <div className="small muted">{s.text}</div>
                 <div className="small row" style={{ gap: '2px 14px' }}>
-                  <span>문항 {s.itemNos.join(', ')}</span>
+                  <span>문항 {s.itemLabels.join(', ')}</span>
                   <span>수준별 {result.activeLevels.map((l) => `${l} ${fmt1(s.byLevel[l].rate)}`).join(' / ')}</span>
                 </div>
               </li>

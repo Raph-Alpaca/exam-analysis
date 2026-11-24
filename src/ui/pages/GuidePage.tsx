@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
 import { Icon, OmrMark } from '../components/Icon'
+import { ContactLine, SiteFooter } from '../components/SiteFooter'
 
-/** 사용 안내 — 필요한 파일, 알아둘 점, 분석 내용, 계산 방식 */
+/** 사용 안내 — 필요한 파일, 알아둘 점, 분석 내용, 계산 방식, 문의 */
 export function GuidePage() {
   useEffect(() => {
     document.title = '사용 안내 · 성취평가 결과 분석'
@@ -186,8 +187,18 @@ export function GuidePage() {
               </li>
             </ul>
           </section>
+
+          <section className="card">
+            <h2>문의</h2>
+            <p style={{ margin: 0 }}>
+              <ContactLine />
+            </p>
+          </section>
         </div>
       </main>
+
+      {/* 문의 문장은 바로 위 "문의" 항목에 있으므로 여기서는 되풀이하지 않는다 */}
+      <SiteFooter narrow contact={false} guideLink={false} />
     </>
   )
 }

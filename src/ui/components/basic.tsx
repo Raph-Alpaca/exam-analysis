@@ -38,8 +38,8 @@ export function KpiTile({ label, value, sub }: { label: string; value: ReactNode
 export function InlineBar({ value, isKey, max = 100 }: { value: number | null | undefined; isKey?: boolean; max?: number }) {
   const v = value == null || !Number.isFinite(value) ? 0 : Math.max(0, Math.min(max, value))
   return (
-    <span className={`inline-bar${isKey ? ' key' : ''}`} aria-hidden="true">
-      <span style={{ width: `${(100 * v) / max}%` }} />
+    <span className={`inline-bar${isKey ? ' key' : ''}`}>
+      <span style={{ width: `${(100 * v) / max}%` }} aria-hidden="true" />
       <b>{value == null ? '-' : value.toFixed(1)}</b>
     </span>
   )

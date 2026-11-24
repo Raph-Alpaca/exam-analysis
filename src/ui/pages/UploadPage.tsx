@@ -3,6 +3,7 @@ import { useAppStore, type FileEntry } from '../store/useAppStore'
 import { navigate } from '../app/router'
 import { Callout, WarningList } from '../components/basic'
 import { Icon, OmrMark } from '../components/Icon'
+import { SiteFooter } from '../components/SiteFooter'
 import { describeHeader } from '../../parsers/header'
 import { fmtPoints } from '../../model/format'
 import { loadDemoFiles } from '../store/demo'
@@ -287,12 +288,7 @@ export function UploadPage() {
         </details>
       </main>
 
-      <footer className="site-foot">
-        <div className="container container-upload">
-          <span>올린 파일은 이 브라우저 밖으로 나가지 않습니다.</span>
-          <a href="#/guide">사용 안내</a>
-        </div>
-      </footer>
+      <SiteFooter narrow />
     </>
   )
 }

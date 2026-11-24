@@ -6,6 +6,7 @@ import { Tabs } from '../components/Tabs'
 import { Drawer } from '../components/Drawer'
 import { EmptyState, WarningList } from '../components/basic'
 import { Icon, OmrMark } from '../components/Icon'
+import { SiteFooter } from '../components/SiteFooter'
 import { SettingsPanel } from './SettingsPanel'
 import { describeHeader } from '../../parsers/header'
 import { exportExcel } from '../../export/excel'
@@ -87,6 +88,7 @@ export function ResultsPage({ tab }: { tab: ResultTab }) {
             </a>
           </EmptyState>
         </main>
+        <SiteFooter />
       </>
     )
   }
@@ -188,6 +190,7 @@ export function ResultsPage({ tab }: { tab: ResultTab }) {
           </div>
         </div>
       </main>
+      <SiteFooter />
       <Drawer open={settingsOpen} onClose={() => setUi({ settingsOpen: false })} title="분석 설정">
         <SettingsPanel />
       </Drawer>

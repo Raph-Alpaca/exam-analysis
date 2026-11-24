@@ -23,6 +23,7 @@
   .drawer-backdrop,
   .class-filter,
   .btn,
+  .site-foot,
   details.help {
     display: none !important;
   }

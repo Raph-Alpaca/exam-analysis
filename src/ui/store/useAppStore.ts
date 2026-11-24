@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Exam, Level, Warning } from '../../model/types'
-import { DEFAULT_SETTINGS, type Settings } from '../../model/settings'
+import { DEFAULT_SETTINGS, sanitizeSettings, type Settings } from '../../model/settings'
 import { readWorkbookFile } from '../../xlsx/readWorkbook'
 import { buildExam, FILE_KIND_LABEL, parseGrids, type FileKind, type ParsedFile } from '../../parsers/index'
 
@@ -137,12 +137,12 @@ export const useAppStore = create<AppState>()(
         const p = (persisted as Partial<AppState> | undefined) ?? {}
         return {
           ...current,
-          settings: {
+          settings: sanitizeSettings({
             ...current.settings,
             ...(p.settings ?? {}),
             cutoffs: { ...current.settings.cutoffs, ...(p.settings?.cutoffs ?? {}) },
             cutoffs3: { ...current.settings.cutoffs3, ...(p.settings?.cutoffs3 ?? {}) },
-          },
+          }),
         }
       },
     },

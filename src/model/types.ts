@@ -175,6 +175,8 @@ export interface StandardStats {
   text: string
   domain?: string
   itemNos: number[]
+  /** 표시용 문항 이름 ("3", "서답1"). 서답형 번호는 선다형과 겹치므로 화면·엑셀에는 이것을 쓴다. */
+  itemLabels: string[]
   maxPoints: number
   overall: RateStats
   byLevel: Record<Level, RateStats>

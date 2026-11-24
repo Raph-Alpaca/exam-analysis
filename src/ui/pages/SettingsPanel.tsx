@@ -1,6 +1,28 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useAppStore } from '../store/useAppStore'
-import { validateCutoffs, validateCutoffs3 } from '../../model/settings'
+import { DEFAULT_SETTINGS, describeCutoffs, isValidPassPct, validateCutoffs, validateCutoffs3, type Cutoffs, type Cutoffs3, type Settings } from '../../model/settings'
+
+/** 입력 칸에 적힌 글자. 올바른 값이 됐을 때만 설정에 반영한다(빈 칸이나 입력 도중의 값으로 분석하지 않도록). */
+interface Draft {
+  cutoffs: Record<keyof Cutoffs, string>
+  cutoffs3: Record<keyof Cutoffs3, string>
+  pass: string
+}
+
+function draftOf(s: Settings): Draft {
+  return {
+    cutoffs: { AB: String(s.cutoffs.AB), BC: String(s.cutoffs.BC), CD: String(s.cutoffs.CD), DE: String(s.cutoffs.DE) },
+    cutoffs3: { AB: String(s.cutoffs3.AB), BC: String(s.cutoffs3.BC) },
+    pass: String(s.standardPassPct),
+  }
+}
+
+/** 빈 칸은 0이 아니라 "값 없음" */
+function toNumber(text: string): number {
+  return text.trim() === '' ? NaN : Number(text)
+}
+const toCutoffs = (d: Draft['cutoffs']): Cutoffs => ({ AB: toNumber(d.AB), BC: toNumber(d.BC), CD: toNumber(d.CD), DE: toNumber(d.DE) })
+const toCutoffs3 = (d: Draft['cutoffs3']): Cutoffs3 => ({ AB: toNumber(d.AB), BC: toNumber(d.BC) })
 
 /** 선택지 이름과 그 아래 한 줄 설명 */
 function Opt({ label, desc }: { label: ReactNode; desc?: ReactNode }) {
@@ -18,17 +40,34 @@ export function SettingsPanel() {
   const resetSettings = useAppStore((s) => s.resetSettings)
   const exam = useAppStore((s) => s.exam)
   const three = settings.levelScheme === 'three'
-  const err = three ? validateCutoffs3(settings.cutoffs3) : validateCutoffs(settings.cutoffs)
-  const cut = (k: keyof typeof settings.cutoffs) => (
+  const [draft, setDraft] = useState<Draft>(() => draftOf(settings))
+  const blank = Object.values(three ? draft.cutoffs3 : draft.cutoffs).some((t) => t.trim() === '')
+  const err = blank ? '분할점수를 모두 입력해 주세요.' : three ? validateCutoffs3(toCutoffs3(draft.cutoffs3)) : validateCutoffs(toCutoffs(draft.cutoffs))
+  const passOk = isValidPassPct(toNumber(draft.pass))
+  const changeCut = (k: keyof Cutoffs, text: string) => {
+    const next = { ...draft.cutoffs, [k]: text }
+    setDraft({ ...draft, cutoffs: next })
+    if (validateCutoffs(toCutoffs(next)) == null) setSettings({ cutoffs: toCutoffs(next) })
+  }
+  const changeCut3 = (k: keyof Cutoffs3, text: string) => {
+    const next = { ...draft.cutoffs3, [k]: text }
+    setDraft({ ...draft, cutoffs3: next })
+    if (validateCutoffs3(toCutoffs3(next)) == null) setSettings({ cutoffs3: toCutoffs3(next) })
+  }
+  const changePass = (text: string) => {
+    setDraft({ ...draft, pass: text })
+    if (isValidPassPct(toNumber(text))) setSettings({ standardPassPct: toNumber(text) })
+  }
+  const cut = (k: keyof Cutoffs) => (
     <div className="field" key={k}>
       <label htmlFor={`cut-${k}`}>{k[0]}/{k[1]} 분할점수</label>
-      <input id={`cut-${k}`} type="number" min={0} max={100} step={0.5} value={settings.cutoffs[k]} onChange={(e) => setSettings({ cutoffs: { ...settings.cutoffs, [k]: Number(e.target.value) } })} />
+      <input id={`cut-${k}`} type="number" min={0} max={100} step={0.5} value={draft.cutoffs[k]} onChange={(e) => changeCut(k, e.target.value)} />
     </div>
   )
-  const cut3 = (k: keyof typeof settings.cutoffs3) => (
+  const cut3 = (k: keyof Cutoffs3) => (
     <div className="field" key={k}>
       <label htmlFor={`cut3-${k}`}>{k[0]}/{k[1]} 분할점수</label>
-      <input id={`cut3-${k}`} type="number" min={0} max={100} step={0.5} value={settings.cutoffs3[k]} onChange={(e) => setSettings({ cutoffs3: { ...settings.cutoffs3, [k]: Number(e.target.value) } })} />
+      <input id={`cut3-${k}`} type="number" min={0} max={100} step={0.5} value={draft.cutoffs3[k]} onChange={(e) => changeCut3(k, e.target.value)} />
     </div>
   )
   const hasCr = (exam?.maxima.cr ?? 0) > 0
@@ -60,7 +99,9 @@ export function SettingsPanel() {
           </div>
         )}
         {err ? (
-          <div className="small" style={{ color: 'var(--danger)' }}>{err}</div>
+          <div className="small" style={{ color: 'var(--danger)' }}>
+            {err} 이 값은 적용하지 않았습니다. 지금 분석에 쓰는 분할점수는 {describeCutoffs(settings)}입니다.
+          </div>
         ) : (
           <div className="hint small muted">
             분할점수 이상이면 해당 수준입니다. {three ? '기본값 80/60.' : '기본값 90/80/70/60 (고정 분할점수). 추정 분할점수를 쓰는 과목은 값을 바꾸세요.'}
@@ -114,8 +155,14 @@ export function SettingsPanel() {
         <h3>학생 리포트</h3>
         <div className="field">
           <label htmlFor="pass">성취기준 "도달" 기준 성취율 (%)</label>
-          <input id="pass" type="number" min={0} max={100} step={5} value={settings.standardPassPct} onChange={(e) => setSettings({ standardPassPct: Number(e.target.value) })} />
-          <span className="hint">이 값 이상이면 도달, 50% 이상이면 부분 도달, 그 미만은 미도달로 표시합니다.</span>
+          <input id="pass" type="number" min={0} max={100} step={5} value={draft.pass} onChange={(e) => changePass(e.target.value)} />
+          {passOk ? (
+            <span className="hint">이 값 이상이면 도달, 50% 이상이면 부분 도달, 그 미만은 미도달로 표시합니다.</span>
+          ) : (
+            <span className="hint" style={{ color: 'var(--danger)' }}>
+              0~100 사이의 값을 입력해 주세요. 이 값은 적용하지 않았습니다. 지금은 {settings.standardPassPct}%를 기준으로 표시합니다.
+            </span>
+          )}
         </div>
       </section>
 
@@ -136,7 +183,14 @@ export function SettingsPanel() {
       </section>
 
       <div className="row">
-        <button type="button" className="btn btn-sm" onClick={resetSettings}>
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={() => {
+            resetSettings()
+            setDraft(draftOf(DEFAULT_SETTINGS))
+          }}
+        >
           기본값으로
         </button>
         <span className="muted small">설정은 이 브라우저에 저장됩니다(학생 자료는 저장하지 않습니다).</span>

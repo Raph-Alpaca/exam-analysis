@@ -127,7 +127,7 @@ export function parseAnswerSheet(grid: CellGrid, fileName: string): AnswerSheetP
         crItems.push({ no: Number(h), label: `서답${crItems.length + 1}`, col: c, points })
         continue
       }
-      if (!key) warnings.push({ level: 'warn', code: 'item-no-key', message: `${fileName}: ${h}번 문항의 정답을 읽지 못했습니다("${keyText}"). 이 문항은 채점에서 제외됩니다.` })
+      if (!key) warnings.push({ level: 'warn', code: 'item-no-key', message: `${fileName}: ${h}번 문항의 정답을 읽지 못했습니다("${keyText}"). 채점은 정오표의 맞음(.) 표시대로 하지만, 문항정보표에도 정답이 없으면 답지반응률에 정답 답지를 표시하지 못합니다.` })
       if (points == null) warnings.push({ level: 'warn', code: 'item-no-points', message: `${fileName}: ${h}번 문항의 배점이 없습니다.` })
       mcItems.push({ no: Number(h), col: c, key, points })
     } else if (RE_CR_SCORE.test(h) || RE_ETC_SCORE.test(h) || RE_TOTAL.test(h)) {

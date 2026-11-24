@@ -101,7 +101,7 @@ export function ClassCompareTab({ exam, result }: { exam: Exam; result: Analysis
       </section>
       <section className="card">
         <SectionTitle title="학급별 성취수준 비율">한 줄이 그 반 학생 전체(100%)입니다.</SectionTitle>
-        <LevelStackedBar groups={groups} height={Math.max(160, 60 + groups.length * 34)} />
+        <LevelStackedBar groups={groups} levels={result.activeLevels} height={Math.max(160, 60 + groups.length * 34)} />
       </section>
       <section className="card">
         <SectionTitle title="문항 × 학급 정답률" right={<HeatLegend />}>반마다 유독 낮은 문항을 찾습니다. 마지막 열은 학년 전체 기준(문항분석표가 있으면 그 값, 없으면 올린 반 합계).</SectionTitle>

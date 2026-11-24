@@ -584,6 +584,10 @@ input[type='radio'] {
   color: #a7aebb;
   cursor: not-allowed;
 }
+/* 탭 줄은 위아래가 잘리므로(overflow) 키보드 포커스 테두리를 안쪽에 그린다 */
+.tab:focus-visible {
+  outline-offset: -3px;
+}
 
 /* ---------- 표 ---------- */
 .table-scroll {
@@ -1198,14 +1202,22 @@ details.help summary {
   color: var(--ink-3);
   font-size: var(--fs-xs);
 }
-.site-foot .container {
+.site-foot p {
+  margin: 0;
+}
+.site-foot .contact {
+  margin-bottom: 2px;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+.site-foot .meta {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 6px 20px;
+  gap: 2px 18px;
+  margin-top: 8px;
 }
 .site-foot a {
-  color: var(--ink-3);
+  color: inherit;
 }
 
 /* ---------- 학생 리포트 ---------- */

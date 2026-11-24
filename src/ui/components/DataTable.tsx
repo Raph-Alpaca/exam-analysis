@@ -49,7 +49,13 @@ export function DataTable<T>({ columns, rows, rowKey, caption, onRowClick, selec
     if (!col?.accessor) return rows
     const acc = col.accessor
     const out = [...rows].sort((a, b) => cmp(acc(a), acc(b)))
-    return sort.dir === 'asc' ? out : out.reverse()
+    if (sort.dir === 'asc') return out
+    // 내림차순은 뒤집되, 빈 값("-")은 오름차순 때처럼 맨 아래에 둔다
+    const isEmpty = (r: T) => {
+      const v = acc(r)
+      return v == null || v === ''
+    }
+    return [...out.filter((r) => !isEmpty(r)).reverse(), ...out.filter(isEmpty)]
   }, [rows, sort, columns])
 
   const groups: { label: string; span: number }[] = []

@@ -28,18 +28,28 @@ export function parseGrids(grids: CellGrid[], fileName: string): ParsedFile {
   }
   if (!grid) return { fileName, kind: 'unknown', error: `교과목별 학생답 정오표·문항정보표·문항분석표가 아닌 파일입니다. NEIS에서 받은 파일이 맞다면 XLS data로 다시 저장했는지 확인해 주세요. ${DRM_HINT}` }
   try {
+    let parsed: ParsedFile
     switch (kind) {
       case 'answers':
-        return { fileName, kind, answers: parseAnswerSheet(grid, fileName) }
+        parsed = { fileName, kind, answers: parseAnswerSheet(grid, fileName) }
+        break
       case 'itemInfo':
-        return { fileName, kind, itemInfo: parseItemInfo(grid, fileName) }
+        parsed = { fileName, kind, itemInfo: parseItemInfo(grid, fileName) }
+        break
       case 'answerKey':
-        return { fileName, kind, answerKey: parseAnswerKey(grid, fileName) }
+        parsed = { fileName, kind, answerKey: parseAnswerKey(grid, fileName) }
+        break
       case 'itemAnalysis':
-        return { fileName, kind, itemAnalysis: parseItemAnalysis(grid, fileName) }
+        parsed = { fileName, kind, itemAnalysis: parseItemAnalysis(grid, fileName) }
+        break
       default:
         return { fileName, kind, error: '알 수 없는 파일 종류' }
     }
+    if (grid.errorCells > 0) {
+      const warnings = (parsed.answers ?? parsed.itemInfo ?? parsed.answerKey ?? parsed.itemAnalysis)!.warnings
+      warnings.push({ level: 'warn', code: 'error-cells', message: `${fileName}: 수식 오류(#N/A, #VALUE! 등)가 있는 칸 ${grid.errorCells}개는 빈 칸으로 읽었습니다. 점수 칸이라면 값을 채워 다시 올려 주세요.` })
+    }
+    return parsed
   } catch (e) {
     return { fileName, kind, error: e instanceof Error ? e.message : String(e) }
   }

@@ -51,6 +51,8 @@ function headerConflicts(a: ExamHeader, b: ExamHeader | undefined): string[] {
   cmp('고사', normName(a.examName) || undefined, normName(b.examName) || undefined)
   cmp('학기', a.semester, b.semester)
   cmp('학년도', a.year, b.year)
+  // 고사명 앞의 "3학년"은 normName 이 지우므로, 학년은 따로 비교해야 다른 학년 파일을 가려낸다.
+  cmp('학년', a.grade, b.grade)
   return out
 }
 
@@ -222,8 +224,10 @@ export function buildExam(files: ParsedFile[]): BuildResult {
   const examHeader: ExamHeader = { ...ref.header }
   delete examHeader.classNo
 
-  // 문항정보표(정답·배점 양식) 보강
-  const answerKey = files.find((f) => f.answerKey)?.answerKey
+  // 문항정보표(정답·배점 양식) 보강. 고친 파일을 다시 올리면 옛 파일도 목록에 남으므로 가장 나중 것을 쓴다.
+  const answerKeys = files.filter((f) => f.answerKey).map((f) => f.answerKey!)
+  const answerKey = answerKeys[answerKeys.length - 1]
+  if (answerKeys.length > 1) warnings.push({ level: 'warn', code: 'multiple-answer-key', message: `정답·배점 양식의 문항정보표가 ${answerKeys.length}개 올라와 있어 가장 나중에 올린 것(${answerKey!.fileName})을 씁니다. 쓰지 않는 파일은 목록에서 빼 주세요.` })
   if (answerKey) {
     const conflicts = headerConflicts(examHeader, answerKey.header).filter((x) => x === '교과목')
     if (conflicts.length) warnings.push({ level: 'warn', code: 'answerkey-subject', message: `문항정보표(${answerKey.fileName})의 교과목(${answerKey.header.subject})이 정오표(${examHeader.subject})와 다릅니다. 다른 과목 파일이 아닌지 확인해 주세요.` })
@@ -247,8 +251,10 @@ export function buildExam(files: ParsedFile[]): BuildResult {
     if (answerKey.maxima.bonus) maxima.bonus = answerKey.maxima.bonus
   }
 
-  // 문항정보표 보강 (성취기준·내용영역·난이도)
-  const itemInfo = files.find((f) => f.itemInfo)?.itemInfo
+  // 문항정보표 보강 (성취기준·내용영역·난이도). 여러 개면 가장 나중 것.
+  const itemInfos = files.filter((f) => f.itemInfo).map((f) => f.itemInfo!)
+  const itemInfo = itemInfos[itemInfos.length - 1]
+  if (itemInfos.length > 1) warnings.push({ level: 'warn', code: 'multiple-item-info', message: `문항정보표가 ${itemInfos.length}개 올라와 있어 가장 나중에 올린 것(${itemInfo!.fileName})을 씁니다. 쓰지 않는 파일은 목록에서 빼 주세요.` })
   let standards: Standard[] = []
   if (itemInfo) {
     const conflicts = headerConflicts(examHeader, itemInfo.header).filter((x) => x === '교과목')

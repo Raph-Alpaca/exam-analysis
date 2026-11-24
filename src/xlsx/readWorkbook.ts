@@ -23,12 +23,15 @@ export class CellGrid {
   readonly name: string
   readonly rows: number
   readonly cols: number
+  /** 수식 오류(#N/A, #VALUE! 등) 칸의 수. 이런 칸은 빈 칸으로 읽는다. */
+  readonly errorCells: number
   private readonly cells = new Map<number, Cell>()
 
   constructor(name: string, ws: WorkSheet) {
     this.name = name
     let maxR = 0
     let maxC = 0
+    let errorCells = 0
     for (const addr of Object.keys(ws)) {
       if (addr.startsWith('!')) continue
       const m = /^([A-Z]+)(\d+)$/.exec(addr)
@@ -37,6 +40,11 @@ export class CellGrid {
       const c = colIndex(m[1])
       const cell = ws[addr] as Cell
       if (cell == null || cell.v == null || cell.v === '') continue
+      // 오류 칸은 값(v)에 오류 코드 숫자(#N/A = 42 등)가 들어 있어, 그대로 두면 점수로 읽힌다.
+      if (cell.t === 'e') {
+        errorCells++
+        continue
+      }
       this.cells.set(r * COL_STRIDE + c, cell)
       if (r > maxR) maxR = r
       if (c > maxC) maxC = c
@@ -56,6 +64,7 @@ export class CellGrid {
     }
     this.rows = maxR
     this.cols = maxC
+    this.errorCells = errorCells
   }
 
   get(r: number, c: number): Cell | undefined {

@@ -36,6 +36,7 @@ function buildStats(code: string, text: string, domain: string | undefined, refs
     text,
     domain,
     itemNos: refs.map((r) => r.item.no),
+    itemLabels: refs.map((r) => r.item.label),
     maxPoints: max,
     overall: rateStats(all, max, settings),
     byLevel,
